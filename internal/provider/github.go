@@ -339,3 +339,36 @@ func (p *GitHubProvider) listAllTags(ctx context.Context, namespace, repo string
 	}
 	return tags, nil
 }
+
+// CreateRepository creates a new repository within namespace. If namespace
+// resolves to a GitHub organization, the repository is created in that
+// organization; otherwise it is created for the authenticated user.
+func (p *GitHubProvider) CreateRepository(ctx context.Context, namespace string, input CreateRepositoryInput) (RepositorySummary, error) {
+	account, _, err := p.client.Users.Get(ctx, namespace)
+	if err != nil {
+		return RepositorySummary{}, fmt.Errorf("get account %s: %w", namespace, err)
+	}
+
+	repo := &github.Repository{
+		Name:        github.Ptr(input.Name),
+		Description: github.Ptr(input.Description),
+	}
+
+	org := ""
+	if account.GetType() == "Organization" {
+		org = namespace
+		repo.Visibility = github.Ptr(string(input.Visibility))
+	} else {
+		repo.Private = github.Ptr(input.Visibility != VisibilityPublic)
+	}
+
+	data, _, err := p.client.Repositories.Create(ctx, org, repo)
+	if err != nil {
+		return RepositorySummary{}, fmt.Errorf("create repository %s/%s: %w", namespace, input.Name, err)
+	}
+
+	return p.toRepositorySummary(data, namespace), nil
+}
+
+// Compile-time check that GitHubProvider implements RepositoryProvider.
+var _ RepositoryProvider = (*GitHubProvider)(nil)

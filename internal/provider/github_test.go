@@ -489,3 +489,114 @@ func TestGitHubGetRepositoryState(t *testing.T) {
 		}
 	}
 }
+
+func TestGitHubCreateRepository_Organization(t *testing.T) {
+	p, _ := newGitHubTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/users/acme-corp":
+			writeJSON(t, w, map[string]any{
+				"login": "acme-corp",
+				"type":  "Organization",
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/orgs/acme-corp/repos":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if body["name"] != "new-repo" {
+				t.Errorf("request name = %v, want %q", body["name"], "new-repo")
+			}
+			if body["description"] != "a new repo" {
+				t.Errorf("request description = %v, want %q", body["description"], "a new repo")
+			}
+			if body["visibility"] != "private" {
+				t.Errorf("request visibility = %v, want %q", body["visibility"], "private")
+			}
+			writeJSON(t, w, map[string]any{
+				"name":           "new-repo",
+				"owner":          map[string]any{"login": "acme-corp"},
+				"default_branch": "main",
+				"visibility":     "private",
+				"private":        true,
+				"size":           0,
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	got, err := p.CreateRepository(context.Background(), "acme-corp", CreateRepositoryInput{
+		Name:        "new-repo",
+		Visibility:  VisibilityPrivate,
+		Description: "a new repo",
+	})
+	if err != nil {
+		t.Fatalf("CreateRepository: %v", err)
+	}
+
+	want := RepositorySummary{
+		Name:          "new-repo",
+		Namespace:     "acme-corp",
+		DefaultBranch: "main",
+		Visibility:    VisibilityPrivate,
+		SizeKB:        0,
+	}
+	if got != want {
+		t.Errorf("CreateRepository = %+v, want %+v", got, want)
+	}
+}
+
+func TestGitHubCreateRepository_OwnNamespace(t *testing.T) {
+	p, _ := newGitHubTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/users/octocat":
+			writeJSON(t, w, map[string]any{
+				"login": "octocat",
+				"type":  "User",
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/user/repos":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if body["name"] != "personal-repo" {
+				t.Errorf("request name = %v, want %q", body["name"], "personal-repo")
+			}
+			if body["private"] != true {
+				t.Errorf("request private = %v, want true", body["private"])
+			}
+			if _, ok := body["visibility"]; ok {
+				t.Errorf("did not expect visibility field in personal repo create request, got %v", body["visibility"])
+			}
+			writeJSON(t, w, map[string]any{
+				"name":           "personal-repo",
+				"owner":          map[string]any{"login": "octocat"},
+				"default_branch": "main",
+				"private":        true,
+				"size":           0,
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	got, err := p.CreateRepository(context.Background(), "octocat", CreateRepositoryInput{
+		Name:        "personal-repo",
+		Visibility:  VisibilityPrivate,
+		Description: "",
+	})
+	if err != nil {
+		t.Fatalf("CreateRepository: %v", err)
+	}
+
+	want := RepositorySummary{
+		Name:          "personal-repo",
+		Namespace:     "octocat",
+		DefaultBranch: "main",
+		Visibility:    VisibilityPrivate,
+		SizeKB:        0,
+	}
+	if got != want {
+		t.Errorf("CreateRepository = %+v, want %+v", got, want)
+	}
+}
