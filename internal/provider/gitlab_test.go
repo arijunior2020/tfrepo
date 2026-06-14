@@ -343,3 +343,175 @@ func TestGitLabListRepositories_OtherUserNamespace(t *testing.T) {
 		t.Errorf("repo[0].SizeKB = %d, want 1", got[0].SizeKB)
 	}
 }
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestGitLabGetRepositoryDetails(t *testing.T) {
+	const namespace = "my-group"
+	const repo = "repo-one"
+	projectID := namespace + "/" + repo
+
+	p, _ := newGitLabTestServer(t, "test-token", func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/"+projectID:
+			q := r.URL.Query()
+			if q.Get("statistics") != "true" {
+				t.Errorf("expected statistics=true query param, got %q", q.Get("statistics"))
+			}
+			writeJSON(t, w, map[string]any{
+				"id":                  10,
+				"name":                repo,
+				"path":                repo,
+				"path_with_namespace": projectID,
+				"default_branch":      "main",
+				"visibility":          "private",
+				"namespace": map[string]any{
+					"full_path": namespace,
+				},
+				"statistics": map[string]any{
+					"repository_size": 1536, // -> 1.5 KB, rounds to 2
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/"+projectID+"/repository/branches":
+			writeJSON(t, w, []map[string]any{
+				{
+					"name": "main",
+					"commit": map[string]any{
+						"id": "abc123",
+					},
+				},
+				{
+					"name": "develop",
+					"commit": map[string]any{
+						"id": "def456",
+					},
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/"+projectID+"/repository/tags":
+			writeJSON(t, w, []map[string]any{
+				{
+					"name": "v1.0.0",
+					"commit": map[string]any{
+						"id": "tag111",
+					},
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	got, err := p.GetRepositoryDetails(context.Background(), namespace, repo)
+	if err != nil {
+		t.Fatalf("GetRepositoryDetails: %v", err)
+	}
+
+	if got.Name != repo {
+		t.Errorf("Name = %q, want %q", got.Name, repo)
+	}
+	if got.Namespace != namespace {
+		t.Errorf("Namespace = %q, want %q", got.Namespace, namespace)
+	}
+	if got.DefaultBranch != "main" {
+		t.Errorf("DefaultBranch = %q, want %q", got.DefaultBranch, "main")
+	}
+	if got.Visibility != VisibilityPrivate {
+		t.Errorf("Visibility = %q, want %q", got.Visibility, VisibilityPrivate)
+	}
+	if got.SizeKB != 2 {
+		t.Errorf("SizeKB = %d, want 2 (round(1536/1024))", got.SizeKB)
+	}
+	if !equalStringSlices(got.Branches, []string{"main", "develop"}) {
+		t.Errorf("Branches = %v, want [main develop]", got.Branches)
+	}
+	if !equalStringSlices(got.Tags, []string{"v1.0.0"}) {
+		t.Errorf("Tags = %v, want [v1.0.0]", got.Tags)
+	}
+}
+
+func TestGitLabGetRepositoryState(t *testing.T) {
+	const namespace = "my-group"
+	const repo = "repo-one"
+	projectID := namespace + "/" + repo
+
+	p, _ := newGitLabTestServer(t, "test-token", func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/"+projectID+"/repository/branches":
+			writeJSON(t, w, []map[string]any{
+				{
+					"name": "main",
+					"commit": map[string]any{
+						"id": "sha-main",
+					},
+				},
+				{
+					"name": "feature/x",
+					"commit": map[string]any{
+						"id": "sha-feature",
+					},
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/"+projectID+"/repository/tags":
+			writeJSON(t, w, []map[string]any{
+				{
+					"name": "v1.0.0",
+					"commit": map[string]any{
+						"id": "sha-tag-1",
+					},
+				},
+				{
+					"name": "v2.0.0",
+					"commit": map[string]any{
+						"id": "sha-tag-2",
+					},
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	got, err := p.GetRepositoryState(context.Background(), namespace, repo)
+	if err != nil {
+		t.Fatalf("GetRepositoryState: %v", err)
+	}
+
+	wantBranches := map[string]string{
+		"main":      "sha-main",
+		"feature/x": "sha-feature",
+	}
+	wantTags := map[string]string{
+		"v1.0.0": "sha-tag-1",
+		"v2.0.0": "sha-tag-2",
+	}
+
+	if len(got.Branches) != len(wantBranches) {
+		t.Fatalf("Branches = %v, want %v", got.Branches, wantBranches)
+	}
+	for name, sha := range wantBranches {
+		if got.Branches[name] != sha {
+			t.Errorf("Branches[%q] = %q, want %q", name, got.Branches[name], sha)
+		}
+	}
+
+	if len(got.Tags) != len(wantTags) {
+		t.Fatalf("Tags = %v, want %v", got.Tags, wantTags)
+	}
+	for name, sha := range wantTags {
+		if got.Tags[name] != sha {
+			t.Errorf("Tags[%q] = %q, want %q", name, got.Tags[name], sha)
+		}
+	}
+}

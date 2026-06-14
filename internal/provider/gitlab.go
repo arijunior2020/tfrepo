@@ -262,3 +262,146 @@ func toRepositorySummary(project *gitlab.Project) RepositorySummary {
 		SizeKB:        sizeKB,
 	}
 }
+
+// GetRepositoryDetails returns the repository summary plus its branch and
+// tag names.
+func (p *GitLabProvider) GetRepositoryDetails(ctx context.Context, namespace, repo string) (RepositoryDetails, error) {
+	projectID := namespace + "/" + repo
+
+	project, _, err := p.client.Projects.GetProject(projectID, &gitlab.GetProjectOptions{
+		Statistics: gitlab.Ptr(true),
+	}, gitlab.WithContext(ctx))
+	if err != nil {
+		return RepositoryDetails{}, fmt.Errorf("get project %q: %w", projectID, err)
+	}
+
+	branchNames, err := p.listAllBranchNames(ctx, projectID)
+	if err != nil {
+		return RepositoryDetails{}, err
+	}
+
+	tagNames, err := p.listAllTagNames(ctx, projectID)
+	if err != nil {
+		return RepositoryDetails{}, err
+	}
+
+	return RepositoryDetails{
+		RepositorySummary: toRepositorySummary(project),
+		Branches:          branchNames,
+		Tags:              tagNames,
+	}, nil
+}
+
+// GetRepositoryState returns a map of branch and tag names to their current
+// commit SHAs.
+func (p *GitLabProvider) GetRepositoryState(ctx context.Context, namespace, repo string) (RepositoryState, error) {
+	projectID := namespace + "/" + repo
+
+	branches, err := p.listAllBranches(ctx, projectID)
+	if err != nil {
+		return RepositoryState{}, err
+	}
+
+	tags, err := p.listAllTags(ctx, projectID)
+	if err != nil {
+		return RepositoryState{}, err
+	}
+
+	branchSHAs := make(map[string]string, len(branches))
+	for _, branch := range branches {
+		if branch.Commit != nil {
+			branchSHAs[branch.Name] = branch.Commit.ID
+		}
+	}
+
+	tagSHAs := make(map[string]string, len(tags))
+	for _, tag := range tags {
+		if tag.Commit != nil {
+			tagSHAs[tag.Name] = tag.Commit.ID
+		}
+	}
+
+	return RepositoryState{
+		Branches: branchSHAs,
+		Tags:     tagSHAs,
+	}, nil
+}
+
+// listAllBranches returns every branch for the given project, paginated.
+func (p *GitLabProvider) listAllBranches(ctx context.Context, projectID string) ([]*gitlab.Branch, error) {
+	var result []*gitlab.Branch
+
+	opts := &gitlab.ListBranchesOptions{
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+	}
+
+	for {
+		branches, resp, err := p.client.Branches.ListBranches(projectID, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list branches for %q: %w", projectID, err)
+		}
+
+		result = append(result, branches...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
+}
+
+// listAllTags returns every tag for the given project, paginated.
+func (p *GitLabProvider) listAllTags(ctx context.Context, projectID string) ([]*gitlab.Tag, error) {
+	var result []*gitlab.Tag
+
+	opts := &gitlab.ListTagsOptions{
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+	}
+
+	for {
+		tags, resp, err := p.client.Tags.ListTags(projectID, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list tags for %q: %w", projectID, err)
+		}
+
+		result = append(result, tags...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
+}
+
+// listAllBranchNames returns only the names of every branch for the given
+// project.
+func (p *GitLabProvider) listAllBranchNames(ctx context.Context, projectID string) ([]string, error) {
+	branches, err := p.listAllBranches(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(branches))
+	for _, branch := range branches {
+		names = append(names, branch.Name)
+	}
+	return names, nil
+}
+
+// listAllTagNames returns only the names of every tag for the given project.
+func (p *GitLabProvider) listAllTagNames(ctx context.Context, projectID string) ([]string, error) {
+	tags, err := p.listAllTags(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		names = append(names, tag.Name)
+	}
+	return names, nil
+}
