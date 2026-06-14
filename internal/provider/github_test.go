@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/google/go-github/v74/github"
 )
 
 func TestGitHubName(t *testing.T) {
@@ -120,4 +122,264 @@ func TestGitHubListNamespaces(t *testing.T) {
 			t.Errorf("namespace[%d] = %+v, want %+v", i, got[i], want[i])
 		}
 	}
+}
+
+// decodeGitHubRepo converts a map of raw GitHub API repository fields into a
+// *github.Repository via JSON, for unit-testing toRepositorySummary directly
+// without an HTTP round trip.
+func decodeGitHubRepo(t *testing.T, fields map[string]any) *github.Repository {
+	t.Helper()
+
+	data, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatalf("marshal repo fields: %v", err)
+	}
+
+	var repo github.Repository
+	if err := json.Unmarshal(data, &repo); err != nil {
+		t.Fatalf("unmarshal repo fields: %v", err)
+	}
+	return &repo
+}
+
+func TestGitHubListRepositories_Organization(t *testing.T) {
+	p, _ := newGitHubTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/users/acme-corp":
+			writeJSON(t, w, map[string]any{
+				"login": "acme-corp",
+				"type":  "Organization",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/orgs/acme-corp/repos":
+			writeJSON(t, w, []map[string]any{
+				{
+					"name":           "widget-api",
+					"owner":          map[string]any{"login": "acme-corp"},
+					"default_branch": "main",
+					"private":        false,
+					"size":           1234,
+				},
+				{
+					"name":           "widget-internal",
+					"owner":          map[string]any{"login": "acme-corp"},
+					"default_branch": "develop",
+					"visibility":     "internal",
+					"private":        true,
+					"size":           5678,
+				},
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	got, err := p.ListRepositories(context.Background(), "acme-corp")
+	if err != nil {
+		t.Fatalf("ListRepositories: %v", err)
+	}
+
+	want := []RepositorySummary{
+		{Name: "widget-api", Namespace: "acme-corp", DefaultBranch: "main", Visibility: VisibilityPublic, SizeKB: 1234},
+		{Name: "widget-internal", Namespace: "acme-corp", DefaultBranch: "develop", Visibility: VisibilityInternal, SizeKB: 5678},
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d repos, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("repo[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestGitHubListRepositories_OwnNamespace(t *testing.T) {
+	p, _ := newGitHubTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/users/octocat":
+			writeJSON(t, w, map[string]any{
+				"login": "octocat",
+				"type":  "User",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/user":
+			writeJSON(t, w, map[string]any{
+				"login": "octocat",
+				"name":  "The Octocat",
+				"type":  "User",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/user/repos":
+			if got := r.URL.Query().Get("affiliation"); got != "owner" {
+				t.Errorf("expected affiliation=owner query param, got %q", got)
+			}
+			writeJSON(t, w, []map[string]any{
+				{
+					"name":           "public-repo",
+					"owner":          map[string]any{"login": "octocat"},
+					"default_branch": "main",
+					"private":        false,
+					"size":           10,
+				},
+				{
+					"name":           "secret-repo",
+					"owner":          map[string]any{"login": "octocat"},
+					"default_branch": "main",
+					"private":        true,
+					"size":           20,
+				},
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	got, err := p.ListRepositories(context.Background(), "octocat")
+	if err != nil {
+		t.Fatalf("ListRepositories: %v", err)
+	}
+
+	want := []RepositorySummary{
+		{Name: "public-repo", Namespace: "octocat", DefaultBranch: "main", Visibility: VisibilityPublic, SizeKB: 10},
+		{Name: "secret-repo", Namespace: "octocat", DefaultBranch: "main", Visibility: VisibilityPrivate, SizeKB: 20},
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d repos, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("repo[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestGitHubListRepositories_OtherUserNamespace(t *testing.T) {
+	p, _ := newGitHubTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/users/someone-else":
+			writeJSON(t, w, map[string]any{
+				"login": "someone-else",
+				"type":  "User",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/user":
+			writeJSON(t, w, map[string]any{
+				"login": "octocat",
+				"name":  "The Octocat",
+				"type":  "User",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/users/someone-else/repos":
+			writeJSON(t, w, []map[string]any{
+				{
+					"name":           "their-public-repo",
+					"owner":          map[string]any{"login": "someone-else"},
+					"default_branch": "main",
+					"private":        false,
+					"size":           42,
+				},
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	got, err := p.ListRepositories(context.Background(), "someone-else")
+	if err != nil {
+		t.Fatalf("ListRepositories: %v", err)
+	}
+
+	want := []RepositorySummary{
+		{Name: "their-public-repo", Namespace: "someone-else", DefaultBranch: "main", Visibility: VisibilityPublic, SizeKB: 42},
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d repos, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("repo[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestGitHubToRepositorySummary_VisibilityMapping(t *testing.T) {
+	p, err := NewGitHubProvider("token", "")
+	if err != nil {
+		t.Fatalf("NewGitHubProvider: %v", err)
+	}
+
+	t.Run("internal visibility wins regardless of private flag", func(t *testing.T) {
+		repo := decodeGitHubRepo(t, map[string]any{
+			"name":       "internal-repo",
+			"visibility": "internal",
+			"private":    false,
+			"size":       100,
+		})
+
+		got := p.toRepositorySummary(repo, "acme-corp")
+		if got.Visibility != VisibilityInternal {
+			t.Errorf("Visibility = %q, want %q", got.Visibility, VisibilityInternal)
+		}
+	})
+
+	t.Run("falls back to private when visibility absent and private true", func(t *testing.T) {
+		repo := decodeGitHubRepo(t, map[string]any{
+			"name":    "secret-repo",
+			"private": true,
+			"size":    50,
+		})
+
+		got := p.toRepositorySummary(repo, "octocat")
+		if got.Visibility != VisibilityPrivate {
+			t.Errorf("Visibility = %q, want %q", got.Visibility, VisibilityPrivate)
+		}
+	})
+
+	t.Run("falls back to public when visibility absent and private false", func(t *testing.T) {
+		repo := decodeGitHubRepo(t, map[string]any{
+			"name":    "open-repo",
+			"private": false,
+			"size":    50,
+		})
+
+		got := p.toRepositorySummary(repo, "octocat")
+		if got.Visibility != VisibilityPublic {
+			t.Errorf("Visibility = %q, want %q", got.Visibility, VisibilityPublic)
+		}
+	})
+
+	t.Run("missing size defaults to zero", func(t *testing.T) {
+		repo := decodeGitHubRepo(t, map[string]any{
+			"name":    "no-size-repo",
+			"private": false,
+		})
+
+		got := p.toRepositorySummary(repo, "octocat")
+		if got.SizeKB != 0 {
+			t.Errorf("SizeKB = %d, want 0", got.SizeKB)
+		}
+	})
+
+	t.Run("uses owner login over namespace argument when present", func(t *testing.T) {
+		repo := decodeGitHubRepo(t, map[string]any{
+			"name":    "forked-repo",
+			"owner":   map[string]any{"login": "real-owner"},
+			"private": false,
+		})
+
+		got := p.toRepositorySummary(repo, "namespace-arg")
+		if got.Namespace != "real-owner" {
+			t.Errorf("Namespace = %q, want %q", got.Namespace, "real-owner")
+		}
+	})
+
+	t.Run("falls back to namespace argument when owner absent", func(t *testing.T) {
+		repo := decodeGitHubRepo(t, map[string]any{
+			"name":    "no-owner-repo",
+			"private": false,
+		})
+
+		got := p.toRepositorySummary(repo, "namespace-arg")
+		if got.Namespace != "namespace-arg" {
+			t.Errorf("Namespace = %q, want %q", got.Namespace, "namespace-arg")
+		}
+	})
 }
