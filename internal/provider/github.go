@@ -237,3 +237,105 @@ func (p *GitHubProvider) toRepositorySummary(repo *github.Repository, namespace 
 		SizeKB:        int64(repo.GetSize()),
 	}
 }
+
+// GetRepositoryDetails returns repository metadata together with the full
+// list of branch and tag names.
+func (p *GitHubProvider) GetRepositoryDetails(ctx context.Context, namespace, repo string) (RepositoryDetails, error) {
+	data, _, err := p.client.Repositories.Get(ctx, namespace, repo)
+	if err != nil {
+		return RepositoryDetails{}, fmt.Errorf("get repository %s/%s: %w", namespace, repo, err)
+	}
+
+	branches, err := p.listAllBranches(ctx, namespace, repo)
+	if err != nil {
+		return RepositoryDetails{}, err
+	}
+
+	tags, err := p.listAllTags(ctx, namespace, repo)
+	if err != nil {
+		return RepositoryDetails{}, err
+	}
+
+	branchNames := make([]string, 0, len(branches))
+	for _, branch := range branches {
+		branchNames = append(branchNames, branch.GetName())
+	}
+
+	tagNames := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		tagNames = append(tagNames, tag.GetName())
+	}
+
+	return RepositoryDetails{
+		RepositorySummary: p.toRepositorySummary(data, namespace),
+		Branches:          branchNames,
+		Tags:              tagNames,
+	}, nil
+}
+
+// GetRepositoryState returns every branch and tag mapped to its current
+// commit SHA.
+func (p *GitHubProvider) GetRepositoryState(ctx context.Context, namespace, repo string) (RepositoryState, error) {
+	branches, err := p.listAllBranches(ctx, namespace, repo)
+	if err != nil {
+		return RepositoryState{}, err
+	}
+
+	tags, err := p.listAllTags(ctx, namespace, repo)
+	if err != nil {
+		return RepositoryState{}, err
+	}
+
+	branchMap := make(map[string]string, len(branches))
+	for _, branch := range branches {
+		branchMap[branch.GetName()] = branch.GetCommit().GetSHA()
+	}
+
+	tagMap := make(map[string]string, len(tags))
+	for _, tag := range tags {
+		tagMap[tag.GetName()] = tag.GetCommit().GetSHA()
+	}
+
+	return RepositoryState{
+		Branches: branchMap,
+		Tags:     tagMap,
+	}, nil
+}
+
+// listAllBranches collects every branch across all pages.
+func (p *GitHubProvider) listAllBranches(ctx context.Context, namespace, repo string) ([]*github.Branch, error) {
+	var branches []*github.Branch
+	opts := &github.BranchListOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		page, resp, err := p.client.Repositories.ListBranches(ctx, namespace, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("list branches for %s/%s: %w", namespace, repo, err)
+		}
+		branches = append(branches, page...)
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return branches, nil
+}
+
+// listAllTags collects every tag across all pages.
+func (p *GitHubProvider) listAllTags(ctx context.Context, namespace, repo string) ([]*github.RepositoryTag, error) {
+	var tags []*github.RepositoryTag
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		page, resp, err := p.client.Repositories.ListTags(ctx, namespace, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("list tags for %s/%s: %w", namespace, repo, err)
+		}
+		tags = append(tags, page...)
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return tags, nil
+}

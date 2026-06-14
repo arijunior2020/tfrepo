@@ -383,3 +383,109 @@ func TestGitHubToRepositorySummary_VisibilityMapping(t *testing.T) {
 		}
 	})
 }
+
+func TestGitHubGetRepositoryDetails(t *testing.T) {
+	p, _ := newGitHubTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme-corp/widget-api":
+			writeJSON(t, w, map[string]any{
+				"name":           "widget-api",
+				"owner":          map[string]any{"login": "acme-corp"},
+				"default_branch": "main",
+				"private":        false,
+				"size":           1234,
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme-corp/widget-api/branches":
+			writeJSON(t, w, []map[string]any{
+				{"name": "main", "commit": map[string]any{"sha": "aaa111"}},
+				{"name": "develop", "commit": map[string]any{"sha": "bbb222"}},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme-corp/widget-api/tags":
+			writeJSON(t, w, []map[string]any{
+				{"name": "v1.0.0", "commit": map[string]any{"sha": "ccc333"}},
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	got, err := p.GetRepositoryDetails(context.Background(), "acme-corp", "widget-api")
+	if err != nil {
+		t.Fatalf("GetRepositoryDetails: %v", err)
+	}
+
+	if got.Name != "widget-api" || got.Namespace != "acme-corp" || got.DefaultBranch != "main" {
+		t.Errorf("unexpected summary: %+v", got.RepositorySummary)
+	}
+	if got.Visibility != VisibilityPublic {
+		t.Errorf("Visibility = %q, want %q", got.Visibility, VisibilityPublic)
+	}
+	if got.SizeKB != 1234 {
+		t.Errorf("SizeKB = %d, want 1234", got.SizeKB)
+	}
+
+	wantBranches := []string{"main", "develop"}
+	if len(got.Branches) != len(wantBranches) {
+		t.Fatalf("Branches = %v, want %v", got.Branches, wantBranches)
+	}
+	for i := range wantBranches {
+		if got.Branches[i] != wantBranches[i] {
+			t.Errorf("Branches[%d] = %q, want %q", i, got.Branches[i], wantBranches[i])
+		}
+	}
+
+	wantTags := []string{"v1.0.0"}
+	if len(got.Tags) != len(wantTags) {
+		t.Fatalf("Tags = %v, want %v", got.Tags, wantTags)
+	}
+	for i := range wantTags {
+		if got.Tags[i] != wantTags[i] {
+			t.Errorf("Tags[%d] = %q, want %q", i, got.Tags[i], wantTags[i])
+		}
+	}
+}
+
+func TestGitHubGetRepositoryState(t *testing.T) {
+	p, _ := newGitHubTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme-corp/widget-api/branches":
+			writeJSON(t, w, []map[string]any{
+				{"name": "main", "commit": map[string]any{"sha": "aaa111"}},
+				{"name": "develop", "commit": map[string]any{"sha": "bbb222"}},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/acme-corp/widget-api/tags":
+			writeJSON(t, w, []map[string]any{
+				{"name": "v1.0.0", "commit": map[string]any{"sha": "ccc333"}},
+				{"name": "v1.1.0", "commit": map[string]any{"sha": "ddd444"}},
+			})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	got, err := p.GetRepositoryState(context.Background(), "acme-corp", "widget-api")
+	if err != nil {
+		t.Fatalf("GetRepositoryState: %v", err)
+	}
+
+	wantBranches := map[string]string{"main": "aaa111", "develop": "bbb222"}
+	wantTags := map[string]string{"v1.0.0": "ccc333", "v1.1.0": "ddd444"}
+
+	if len(got.Branches) != len(wantBranches) {
+		t.Fatalf("Branches = %v, want %v", got.Branches, wantBranches)
+	}
+	for k, v := range wantBranches {
+		if got.Branches[k] != v {
+			t.Errorf("Branches[%q] = %q, want %q", k, got.Branches[k], v)
+		}
+	}
+
+	if len(got.Tags) != len(wantTags) {
+		t.Fatalf("Tags = %v, want %v", got.Tags, wantTags)
+	}
+	for k, v := range wantTags {
+		if got.Tags[k] != v {
+			t.Errorf("Tags[%q] = %q, want %q", k, got.Tags[k], v)
+		}
+	}
+}
