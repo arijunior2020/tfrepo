@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -53,4 +54,49 @@ func (p *GitLabProvider) GetAuthenticatedCloneURL(namespace, repo string) string
 	}
 
 	return fmt.Sprintf("https://oauth2:%s@%s/%s/%s.git", p.token, host, namespace, repo)
+}
+
+// ListNamespaces returns every namespace (user or group, including
+// subgroups) visible to the authenticated token.
+func (p *GitLabProvider) ListNamespaces(ctx context.Context) ([]Namespace, error) {
+	var result []Namespace
+
+	opts := &gitlab.ListNamespacesOptions{
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+	}
+
+	for {
+		namespaces, resp, err := p.client.Namespaces.ListNamespaces(opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list namespaces: %w", err)
+		}
+
+		for _, ns := range namespaces {
+			result = append(result, Namespace{
+				Slug: ns.FullPath,
+				Name: ns.Name,
+				Kind: namespaceKindFromString(ns.Kind),
+			})
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
+}
+
+// namespaceKindFromString maps GitLab's namespace "kind" string to the
+// shared NamespaceKind type.
+func namespaceKindFromString(kind string) NamespaceKind {
+	switch kind {
+	case "group":
+		return NamespaceGroup
+	case "user":
+		return NamespaceUser
+	default:
+		return NamespaceKind(kind)
+	}
 }
