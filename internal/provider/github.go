@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -74,4 +75,46 @@ func (p *GitHubProvider) gitHost() string {
 		return parsed.Host
 	}
 	return defaultGitHubHost
+}
+
+// ListNamespaces returns the authenticated user's namespace plus every
+// organization the authenticated user belongs to.
+func (p *GitHubProvider) ListNamespaces(ctx context.Context) ([]Namespace, error) {
+	user, _, err := p.client.Users.Get(ctx, "")
+	if err != nil {
+		return nil, fmt.Errorf("get authenticated user: %w", err)
+	}
+
+	namespaces := make([]Namespace, 0, 1)
+
+	name := user.GetName()
+	if name == "" {
+		name = user.GetLogin()
+	}
+	namespaces = append(namespaces, Namespace{
+		Slug: user.GetLogin(),
+		Name: name,
+		Kind: NamespaceUser,
+	})
+
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		orgs, resp, err := p.client.Organizations.List(ctx, "", opts)
+		if err != nil {
+			return nil, fmt.Errorf("list organizations for authenticated user: %w", err)
+		}
+		for _, org := range orgs {
+			namespaces = append(namespaces, Namespace{
+				Slug: org.GetLogin(),
+				Name: org.GetLogin(),
+				Kind: NamespaceOrganization,
+			})
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return namespaces, nil
 }
