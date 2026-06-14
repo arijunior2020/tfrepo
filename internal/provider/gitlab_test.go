@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -513,5 +515,91 @@ func TestGitLabGetRepositoryState(t *testing.T) {
 		if got.Tags[name] != sha {
 			t.Errorf("Tags[%q] = %q, want %q", name, got.Tags[name], sha)
 		}
+	}
+}
+
+func decodeJSONBody(t *testing.T, r *http.Request) map[string]any {
+	t.Helper()
+
+	var body map[string]any
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&body); err != nil {
+		t.Fatalf("decode request body: %v", err)
+	}
+	return body
+}
+
+func TestGitLabCreateRepository(t *testing.T) {
+	const namespace = "my-group"
+
+	p, _ := newGitLabTestServer(t, "test-token", func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/namespaces/"+namespace:
+			writeJSON(t, w, map[string]any{
+				"id":        2,
+				"name":      "My Group",
+				"path":      namespace,
+				"kind":      "group",
+				"full_path": namespace,
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v4/projects":
+			body := decodeJSONBody(t, r)
+
+			if body["name"] != "new-repo" {
+				t.Errorf("request name = %v, want %q", body["name"], "new-repo")
+			}
+			if body["path"] != "new-repo" {
+				t.Errorf("request path = %v, want %q", body["path"], "new-repo")
+			}
+			if fmt.Sprintf("%v", body["namespace_id"]) != "2" {
+				t.Errorf("request namespace_id = %v, want 2", body["namespace_id"])
+			}
+			if body["visibility"] != "private" {
+				t.Errorf("request visibility = %v, want %q", body["visibility"], "private")
+			}
+			if body["description"] != "A new repo" {
+				t.Errorf("request description = %v, want %q", body["description"], "A new repo")
+			}
+
+			writeJSON(t, w, map[string]any{
+				"id":                  40,
+				"name":                "new-repo",
+				"path":                "new-repo",
+				"path_with_namespace": namespace + "/new-repo",
+				"default_branch":      "main",
+				"visibility":          "private",
+				"namespace": map[string]any{
+					"full_path": namespace,
+				},
+				"statistics": map[string]any{
+					"repository_size": 0,
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	got, err := p.CreateRepository(context.Background(), namespace, CreateRepositoryInput{
+		Name:        "new-repo",
+		Visibility:  VisibilityPrivate,
+		Description: "A new repo",
+	})
+	if err != nil {
+		t.Fatalf("CreateRepository: %v", err)
+	}
+
+	if got.Name != "new-repo" {
+		t.Errorf("Name = %q, want %q", got.Name, "new-repo")
+	}
+	if got.Namespace != namespace {
+		t.Errorf("Namespace = %q, want %q", got.Namespace, namespace)
+	}
+	if got.Visibility != VisibilityPrivate {
+		t.Errorf("Visibility = %q, want %q", got.Visibility, VisibilityPrivate)
+	}
+	if got.SizeKB != 0 {
+		t.Errorf("SizeKB = %d, want 0", got.SizeKB)
 	}
 }

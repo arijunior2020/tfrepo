@@ -405,3 +405,27 @@ func (p *GitLabProvider) listAllTagNames(ctx context.Context, projectID string) 
 	}
 	return names, nil
 }
+
+// CreateRepository creates a new project within the given namespace.
+func (p *GitLabProvider) CreateRepository(ctx context.Context, namespace string, input CreateRepositoryInput) (RepositorySummary, error) {
+	ns, _, err := p.client.Namespaces.GetNamespace(namespace, gitlab.WithContext(ctx))
+	if err != nil {
+		return RepositorySummary{}, fmt.Errorf("get namespace %q: %w", namespace, err)
+	}
+
+	project, _, err := p.client.Projects.CreateProject(&gitlab.CreateProjectOptions{
+		Name:        gitlab.Ptr(input.Name),
+		Path:        gitlab.Ptr(input.Name),
+		NamespaceID: gitlab.Ptr(ns.ID),
+		Visibility:  gitlab.Ptr(gitlab.VisibilityValue(input.Visibility)),
+		Description: gitlab.Ptr(input.Description),
+	}, gitlab.WithContext(ctx))
+	if err != nil {
+		return RepositorySummary{}, fmt.Errorf("create project %q in namespace %q: %w", input.Name, namespace, err)
+	}
+
+	return toRepositorySummary(project), nil
+}
+
+// Compile-time check that GitLabProvider implements RepositoryProvider.
+var _ RepositoryProvider = (*GitLabProvider)(nil)
