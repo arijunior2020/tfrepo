@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/url"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
@@ -98,5 +99,166 @@ func namespaceKindFromString(kind string) NamespaceKind {
 		return NamespaceUser
 	default:
 		return NamespaceKind(kind)
+	}
+}
+
+// ListRepositories lists the repositories visible to the token within the
+// given namespace.
+//
+// This fixes a bug present in the v0.1.0 Node implementation: that version
+// resolved "another user's personal namespace" by listing the token owner's
+// own projects and filtering by namespace, which silently returned an empty
+// slice for any namespace that wasn't the token owner's own. This
+// implementation instead branches on the namespace kind:
+//
+//  1. "group"       -> list all projects within that group/subgroup that the
+//     token can see (Groups.ListGroupProjects).
+//  2. "user", self  -> list the authenticated user's own projects, including
+//     private ones (Projects.ListProjects with Owned=true).
+//  3. "user", other -> list that user's publicly visible projects
+//     (Projects.ListUserProjects).
+func (p *GitLabProvider) ListRepositories(ctx context.Context, namespace string) ([]RepositorySummary, error) {
+	projects, err := p.listProjectsForNamespace(ctx, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]RepositorySummary, 0, len(projects))
+	for _, project := range projects {
+		summaries = append(summaries, toRepositorySummary(project))
+	}
+	return summaries, nil
+}
+
+// listProjectsForNamespace implements the 3-branch namespace resolution
+// described in ListRepositories.
+func (p *GitLabProvider) listProjectsForNamespace(ctx context.Context, namespace string) ([]*gitlab.Project, error) {
+	ns, _, err := p.client.Namespaces.GetNamespace(namespace, gitlab.WithContext(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("get namespace %q: %w", namespace, err)
+	}
+
+	switch ns.Kind {
+	case "group":
+		return p.listAllGroupProjects(ctx, namespace)
+	case "user":
+		currentUser, _, err := p.client.Users.CurrentUser(gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("get current user: %w", err)
+		}
+
+		if currentUser.Username == namespace {
+			// Branch 2: the token owner's own personal namespace. List
+			// their own projects, including private ones.
+			return p.listOwnProjects(ctx)
+		}
+
+		// Branch 3: another user's personal namespace. List that user's
+		// publicly visible projects.
+		return p.listUserProjects(ctx, namespace)
+	default:
+		return nil, fmt.Errorf("namespace %q has unsupported kind %q", namespace, ns.Kind)
+	}
+}
+
+// listAllGroupProjects lists every project within the given group/subgroup
+// namespace that the authenticated token can see.
+func (p *GitLabProvider) listAllGroupProjects(ctx context.Context, namespace string) ([]*gitlab.Project, error) {
+	var result []*gitlab.Project
+
+	opts := &gitlab.ListGroupProjectsOptions{
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+	}
+
+	for {
+		projects, resp, err := p.client.Groups.ListGroupProjects(namespace, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list group projects for %q: %w", namespace, err)
+		}
+
+		result = append(result, projects...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
+}
+
+// listOwnProjects lists all projects owned by the authenticated user,
+// including private ones.
+func (p *GitLabProvider) listOwnProjects(ctx context.Context) ([]*gitlab.Project, error) {
+	var result []*gitlab.Project
+
+	opts := &gitlab.ListProjectsOptions{
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+		Owned:       gitlab.Ptr(true),
+		Statistics:  gitlab.Ptr(true),
+	}
+
+	for {
+		projects, resp, err := p.client.Projects.ListProjects(opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list own projects: %w", err)
+		}
+
+		result = append(result, projects...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
+}
+
+// listUserProjects lists the publicly visible projects belonging to the
+// given username's personal namespace.
+func (p *GitLabProvider) listUserProjects(ctx context.Context, username string) ([]*gitlab.Project, error) {
+	var result []*gitlab.Project
+
+	opts := &gitlab.ListProjectsOptions{
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+		Statistics:  gitlab.Ptr(true),
+	}
+
+	for {
+		projects, resp, err := p.client.Projects.ListUserProjects(username, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list projects for user %q: %w", username, err)
+		}
+
+		result = append(result, projects...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
+}
+
+// toRepositorySummary maps a GitLab project to a RepositorySummary.
+func toRepositorySummary(project *gitlab.Project) RepositorySummary {
+	var sizeKB int64
+	if project.Statistics != nil {
+		sizeKB = int64(math.Round(float64(project.Statistics.RepositorySize) / 1024))
+	}
+
+	namespace := ""
+	if project.Namespace != nil {
+		namespace = project.Namespace.FullPath
+	}
+
+	return RepositorySummary{
+		Name:          project.Path,
+		Namespace:     namespace,
+		DefaultBranch: project.DefaultBranch,
+		Visibility:    Visibility(project.Visibility),
+		SizeKB:        sizeKB,
 	}
 }
