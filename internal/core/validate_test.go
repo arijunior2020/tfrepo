@@ -206,3 +206,13 @@ func TestValidatePropagatesProviderError(t *testing.T) {
 		t.Fatal("Validate() error = nil, want error")
 	}
 }
+
+func TestValidatePropagatesTargetProviderError(t *testing.T) {
+	source := &fakeValidateProvider{}
+	target := &fakeValidateProvider{stateErr: errors.New("boom")}
+
+	_, err := Validate(context.Background(), baseValidatePlan(), MigrateProviders{Source: source, Target: target}, nil)
+	if err == nil {
+		t.Fatal("Validate() error = nil, want error")
+	}
+}

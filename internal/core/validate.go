@@ -13,7 +13,8 @@ import (
 // Validate compares GetRepositoryState between the source and target for
 // each task in migrationPlan. If report is non-nil, tasks whose result has
 // status "failed" are reported as "skipped" without calling either
-// provider.
+// provider. If either provider's GetRepositoryState call errors for a task,
+// Validate returns immediately with that error and no results.
 func Validate(ctx context.Context, migrationPlan MigrationPlan, providers MigrateProviders, report *MigrationReport) (ValidationReport, error) {
 	failedIDs := make(map[string]struct{})
 	if report != nil {
