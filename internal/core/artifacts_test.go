@@ -141,3 +141,70 @@ func TestMigrationPlanMarshal(t *testing.T) {
 		t.Errorf("round trip = %+v, want %+v", roundTrip, plan)
 	}
 }
+
+func TestMigrationReportMarshal(t *testing.T) {
+	generatedAt, err := time.Parse(time.RFC3339, "2026-06-11T12:30:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse: %v", err)
+	}
+	startedA, err := time.Parse(time.RFC3339, "2026-06-11T12:10:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse: %v", err)
+	}
+	finishedA, err := time.Parse(time.RFC3339, "2026-06-11T12:12:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse: %v", err)
+	}
+	startedB, err := time.Parse(time.RFC3339, "2026-06-11T12:12:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse: %v", err)
+	}
+	finishedB, err := time.Parse(time.RFC3339, "2026-06-11T12:13:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse: %v", err)
+	}
+
+	report := MigrationReport{
+		GeneratedAt: generatedAt,
+		Results: []MigrationResult{
+			{ID: "repo-a", Status: "success", StartedAt: startedA, FinishedAt: finishedA},
+			{ID: "repo-b", Status: "failed", StartedAt: startedB, FinishedAt: finishedB, Error: "push rejected"},
+		},
+	}
+
+	got, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	want := []byte(`{
+		"generatedAt": "2026-06-11T12:30:00Z",
+		"results": [
+			{
+				"id": "repo-a",
+				"status": "success",
+				"startedAt": "2026-06-11T12:10:00Z",
+				"finishedAt": "2026-06-11T12:12:00Z"
+			},
+			{
+				"id": "repo-b",
+				"status": "failed",
+				"startedAt": "2026-06-11T12:12:00Z",
+				"finishedAt": "2026-06-11T12:13:00Z",
+				"error": "push rejected"
+			}
+		]
+	}`)
+
+	if !reflect.DeepEqual(toMap(t, got), toMap(t, want)) {
+		t.Errorf("Marshal(report) = %s, want %s", got, want)
+	}
+
+	var roundTrip MigrationReport
+	if err := json.Unmarshal(got, &roundTrip); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if !reflect.DeepEqual(roundTrip, report) {
+		t.Errorf("round trip = %+v, want %+v", roundTrip, report)
+	}
+}

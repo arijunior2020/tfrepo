@@ -64,3 +64,19 @@ type MigrationPlan struct {
 	Target      ProviderRef     `json:"target"`
 	Tasks       []MigrationTask `json:"tasks"`
 }
+
+// MigrationResult is the outcome of migrating a single repository.
+type MigrationResult struct {
+	ID         string    `json:"id"`
+	Status     string    `json:"status"` // "success" | "failed" | "dry-run"
+	StartedAt  time.Time `json:"startedAt"`
+	FinishedAt time.Time `json:"finishedAt"`
+	Error      string    `json:"error,omitempty"` // always passed through security.Redact() before being set
+}
+
+// MigrationReport is the contents of migration-report.json, produced by
+// `tfrepo migrate`.
+type MigrationReport struct {
+	GeneratedAt time.Time         `json:"generatedAt"`
+	Results     []MigrationResult `json:"results"`
+}
