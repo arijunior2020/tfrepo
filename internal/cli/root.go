@@ -14,6 +14,10 @@ const (
 
 	// programVersion matches PROGRAM_VERSION in apps/cli/src/cli.ts.
 	programVersion = "0.1.0"
+
+	// configFlagName is the name of the persistent --config/-c flag shared by
+	// every subcommand.
+	configFlagName = "config"
 )
 
 // Execute runs the tfrepo root command against os.Args and returns the
@@ -33,6 +37,10 @@ func Execute() int {
 // exit code to *exitCode instead of returning an error for "business" exit
 // codes (e.g. migrate returning 1 because a task failed), mirroring
 // process.exitCode = await deps.runXxx(...) in apps/cli/src/cli.ts.
+//
+// Contract: every subcommand's RunE must set *exitCode before returning nil.
+// Returning a non-nil error from RunE always yields process exit code 1
+// (via Execute), regardless of *exitCode.
 func newRootCommand(exitCode *int) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "tfrepo",
@@ -46,7 +54,7 @@ func newRootCommand(exitCode *int) *cobra.Command {
 		},
 	}
 
-	root.PersistentFlags().StringP("config", "c", defaultConfigPath, "caminho do arquivo de configuração")
+	root.PersistentFlags().StringP(configFlagName, "c", defaultConfigPath, "caminho do arquivo de configuração")
 
 	root.AddCommand(newInitCommand(exitCode))
 
@@ -58,7 +66,7 @@ func newInitCommand(exitCode *int) *cobra.Command {
 		Use:   "init",
 		Short: "Gera um transferepo.config.yaml de exemplo no diretório atual",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configPath, err := cmd.Flags().GetString("config")
+			configPath, err := cmd.Flags().GetString(configFlagName)
 			if err != nil {
 				return err
 			}
