@@ -1,6 +1,8 @@
 package core
 
 import (
+	"encoding/json"
+	"os"
 	"time"
 
 	"github.com/arijunior2020/tfrepo/internal/provider"
@@ -105,4 +107,24 @@ type ValidationResult struct {
 type ValidationReport struct {
 	GeneratedAt time.Time          `json:"generatedAt"`
 	Results     []ValidationResult `json:"results"`
+}
+
+// WriteJSON marshals v as indented JSON and writes it to path, creating or
+// truncating the file with mode 0644.
+func WriteJSON(path string, v any) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return os.WriteFile(path, data, 0o644)
+}
+
+// ReadJSON reads the JSON file at path and unmarshals it into v.
+func ReadJSON(path string, v any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, v)
 }

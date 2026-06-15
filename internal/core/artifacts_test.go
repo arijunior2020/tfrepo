@@ -2,7 +2,10 @@ package core
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -266,5 +269,51 @@ func TestValidationReportMarshal(t *testing.T) {
 	}
 	if !reflect.DeepEqual(roundTrip, report) {
 		t.Errorf("round trip = %+v, want %+v", roundTrip, report)
+	}
+}
+
+func TestWriteAndReadJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "inventory.json")
+
+	generatedAt, err := time.Parse(time.RFC3339, "2026-06-11T12:00:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse: %v", err)
+	}
+
+	inv := Inventory{
+		GeneratedAt: generatedAt,
+		Source:      ProviderRef{Provider: "github", Namespace: "my-org"},
+		Namespaces:  []InventoryNamespace{},
+	}
+
+	if err := WriteJSON(path, inv); err != nil {
+		t.Fatalf("WriteJSON: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(data), `"generatedAt": "2026-06-11T12:00:00Z"`) {
+		t.Errorf("file contents = %s, want to contain generatedAt field", data)
+	}
+
+	var got Inventory
+	if err := ReadJSON(path, &got); err != nil {
+		t.Fatalf("ReadJSON: %v", err)
+	}
+	if !reflect.DeepEqual(got, inv) {
+		t.Errorf("ReadJSON() = %+v, want %+v", got, inv)
+	}
+}
+
+func TestReadJSONMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "missing.json")
+
+	var inv Inventory
+	if err := ReadJSON(path, &inv); err == nil {
+		t.Error("ReadJSON() error = nil, want error")
 	}
 }
