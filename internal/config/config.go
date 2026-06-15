@@ -11,8 +11,8 @@ import (
 
 // ProviderConfig describes one side (source or target) of a migration.
 type ProviderConfig struct {
-	Provider  string `yaml:"provider"`           // "github" | "gitlab"
-	BaseURL   string `yaml:"baseUrl,omitempty"`  // GitHub Enterprise / GitLab self-managed
+	Provider  string `yaml:"provider"`          // "github" | "gitlab"
+	BaseURL   string `yaml:"baseUrl,omitempty"` // GitHub Enterprise / GitLab self-managed
 	Namespace string `yaml:"namespace"`
 }
 
