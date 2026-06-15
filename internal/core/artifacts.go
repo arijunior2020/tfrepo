@@ -39,3 +39,28 @@ type Inventory struct {
 	Source      ProviderRef          `json:"source"`
 	Namespaces  []InventoryNamespace `json:"namespaces"`
 }
+
+// TaskEndpoint identifies a repository within a source or target namespace.
+type TaskEndpoint struct {
+	Namespace string `json:"namespace"`
+	Repo      string `json:"repo"`
+}
+
+// MigrationTask describes the migration of a single repository from source
+// to target.
+type MigrationTask struct {
+	ID       string       `json:"id"`
+	Source   TaskEndpoint `json:"source"`
+	Target   TaskEndpoint `json:"target"`
+	Branches []string     `json:"branches"`
+	Tags     []string     `json:"tags"`
+}
+
+// MigrationPlan is the contents of migration-plan.json, produced by
+// `tfrepo plan`.
+type MigrationPlan struct {
+	GeneratedAt time.Time       `json:"generatedAt"`
+	Source      ProviderRef     `json:"source"`
+	Target      ProviderRef     `json:"target"`
+	Tasks       []MigrationTask `json:"tasks"`
+}
