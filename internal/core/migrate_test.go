@@ -253,6 +253,16 @@ func TestMigrateDryRunRecordsFailedResultWhenTargetNamespaceCheckFails(t *testin
 	}
 }
 
+func TestMigrateReturnsErrorWhenWorkspacesIsNilAndNotDryRun(t *testing.T) {
+	source := &fakeMigrateProvider{name: "github"}
+	target := &fakeMigrateProvider{name: "gitlab", listRepositoriesResult: []provider.RepositorySummary{}}
+
+	_, err := Migrate(context.Background(), baseMigratePlan(), MigrateProviders{Source: source, Target: target}, MigrateOptions{Concurrency: 1})
+	if err == nil {
+		t.Fatal("Migrate() error = nil, want error")
+	}
+}
+
 func TestMigratePreservesTaskOrderUnderConcurrency(t *testing.T) {
 	plan := MigrationPlan{
 		Tasks: []MigrationTask{

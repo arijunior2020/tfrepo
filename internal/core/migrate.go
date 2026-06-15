@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"time"
 
@@ -45,6 +46,10 @@ type MigrateOptions struct {
 // pushing it to the target using up to opts.Concurrency goroutines. Per-task
 // failures are recorded as "failed" results rather than aborting the run.
 func Migrate(ctx context.Context, migrationPlan MigrationPlan, providers MigrateProviders, opts MigrateOptions) (MigrationReport, error) {
+	if !opts.DryRun && opts.Workspaces == nil {
+		return MigrationReport{}, errors.New("MigrateOptions.Workspaces is required when DryRun is false")
+	}
+
 	concurrency := opts.Concurrency
 	if concurrency < 1 {
 		concurrency = 1
