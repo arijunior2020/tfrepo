@@ -208,3 +208,63 @@ func TestMigrationReportMarshal(t *testing.T) {
 		t.Errorf("round trip = %+v, want %+v", roundTrip, report)
 	}
 }
+
+func TestValidationReportMarshal(t *testing.T) {
+	generatedAt, err := time.Parse(time.RFC3339, "2026-06-11T13:00:00Z")
+	if err != nil {
+		t.Fatalf("time.Parse: %v", err)
+	}
+
+	sourceSHA := "abc123"
+	targetSHA := "def456"
+	tagSourceSHA := "aaa"
+
+	report := ValidationReport{
+		GeneratedAt: generatedAt,
+		Results: []ValidationResult{
+			{ID: "repo-a", Status: "ok", Divergences: []RefDivergence{}},
+			{
+				ID:     "repo-b",
+				Status: "diverged",
+				Divergences: []RefDivergence{
+					{Type: "branch", Name: "main", SourceSHA: &sourceSHA, TargetSHA: &targetSHA},
+					{Type: "tag", Name: "v1.0.0", SourceSHA: &tagSourceSHA, TargetSHA: nil},
+				},
+			},
+			{ID: "repo-c", Status: "skipped", Divergences: []RefDivergence{}, Reason: "migration failed"},
+		},
+	}
+
+	got, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	want := []byte(`{
+		"generatedAt": "2026-06-11T13:00:00Z",
+		"results": [
+			{"id": "repo-a", "status": "ok", "divergences": []},
+			{
+				"id": "repo-b",
+				"status": "diverged",
+				"divergences": [
+					{"type": "branch", "name": "main", "sourceSha": "abc123", "targetSha": "def456"},
+					{"type": "tag", "name": "v1.0.0", "sourceSha": "aaa", "targetSha": null}
+				]
+			},
+			{"id": "repo-c", "status": "skipped", "divergences": [], "reason": "migration failed"}
+		]
+	}`)
+
+	if !reflect.DeepEqual(toMap(t, got), toMap(t, want)) {
+		t.Errorf("Marshal(report) = %s, want %s", got, want)
+	}
+
+	var roundTrip ValidationReport
+	if err := json.Unmarshal(got, &roundTrip); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if !reflect.DeepEqual(roundTrip, report) {
+		t.Errorf("round trip = %+v, want %+v", roundTrip, report)
+	}
+}

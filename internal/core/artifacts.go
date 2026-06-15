@@ -80,3 +80,29 @@ type MigrationReport struct {
 	GeneratedAt time.Time         `json:"generatedAt"`
 	Results     []MigrationResult `json:"results"`
 }
+
+// RefDivergence describes a single branch or tag whose commit SHA differs
+// between source and target. SourceSHA/TargetSHA are pointers (not
+// omitempty) so a missing ref serializes as JSON null, matching
+// RefDivergenceSchema's z.string().nullable().
+type RefDivergence struct {
+	Type      string  `json:"type"` // "branch" | "tag"
+	Name      string  `json:"name"`
+	SourceSHA *string `json:"sourceSha"`
+	TargetSHA *string `json:"targetSha"`
+}
+
+// ValidationResult is the outcome of validating a single repository.
+type ValidationResult struct {
+	ID          string          `json:"id"`
+	Status      string          `json:"status"` // "ok" | "diverged" | "skipped"
+	Divergences []RefDivergence `json:"divergences"`
+	Reason      string          `json:"reason,omitempty"` // set when Status == "skipped"
+}
+
+// ValidationReport is the contents of validation-report.json, produced by
+// `tfrepo validate`.
+type ValidationReport struct {
+	GeneratedAt time.Time          `json:"generatedAt"`
+	Results     []ValidationResult `json:"results"`
+}
