@@ -14,6 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	repoSelectionAll      = "all"
+	repoSelectionSpecific = "specific"
+)
+
 // WizardInput holds wizard answers; empty SelectedRepos means all repos (filters.include = ["*"]).
 type WizardInput struct {
 	SourceProvider  string
@@ -53,6 +58,13 @@ func buildConfigYAML(input WizardInput) ([]byte, error) {
 	}
 
 	return yaml.Marshal(cfg)
+}
+
+func validateSpecificRepoSelection(selectedRepos []string) error {
+	if len(selectedRepos) == 0 {
+		return errors.New("selecione pelo menos um repositório")
+	}
+	return nil
 }
 
 func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) int {
@@ -119,27 +131,53 @@ func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) 
 
 	var selectedRepos []string
 	if len(allRepos) > 0 {
-		repoOptions := make([]huh.Option[string], len(allRepos))
-		for i, name := range allRepos {
-			repoOptions[i] = huh.NewOption(name, name)
-		}
+		sort.Strings(allRepos)
 
-		repoForm := huh.NewForm(
+		selectionMode := repoSelectionAll
+		selectionForm := huh.NewForm(
 			huh.NewGroup(
-				huh.NewMultiSelect[string]().
-					Title("Selecione os repositórios a migrar").
-					Description("Espaço = selecionar/desmarcar  ·  Enter = confirmar  ·  Nenhuma seleção = todos").
-					Options(repoOptions...).
-					Value(&selectedRepos),
+				huh.NewSelect[string]().
+					Title("Quais repositórios deseja migrar?").
+					Options(
+						huh.NewOption("Todos os repositórios", repoSelectionAll),
+						huh.NewOption("Selecionar repositórios específicos", repoSelectionSpecific),
+					).
+					Value(&selectionMode),
 			),
 		)
 
-		if err := repoForm.RunWithContext(ctx); err != nil {
+		if err := selectionForm.RunWithContext(ctx); err != nil {
 			if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
 				return 0
 			}
 			fmt.Fprintln(stderr, err)
 			return 1
+		}
+
+		repoOptions := make([]huh.Option[string], len(allRepos))
+		for i, name := range allRepos {
+			repoOptions[i] = huh.NewOption(name, name)
+		}
+
+		if selectionMode == repoSelectionSpecific {
+			repoForm := huh.NewForm(
+				huh.NewGroup(
+					huh.NewMultiSelect[string]().
+						Title("Selecione os repositórios a migrar").
+						Description("Espaço = selecionar/desmarcar  ·  Enter = confirmar").
+						Options(repoOptions...).
+						Value(&selectedRepos).
+						Validate(validateSpecificRepoSelection),
+				),
+			)
+
+			if err := repoForm.RunWithContext(ctx); err != nil {
+				if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
+					return 0
+				}
+				fmt.Fprintln(stderr, err)
+				return 1
+			}
 		}
 	}
 

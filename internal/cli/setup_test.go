@@ -95,6 +95,18 @@ func TestBuildConfigYAMLWithBaseURL(t *testing.T) {
 	}
 }
 
+func TestValidateSpecificRepoSelectionRequiresAtLeastOneRepo(t *testing.T) {
+	if err := validateSpecificRepoSelection(nil); err == nil {
+		t.Fatal("validateSpecificRepoSelection(nil) error = nil, want error")
+	}
+	if err := validateSpecificRepoSelection([]string{}); err == nil {
+		t.Fatal("validateSpecificRepoSelection(empty) error = nil, want error")
+	}
+	if err := validateSpecificRepoSelection([]string{"repo-a"}); err != nil {
+		t.Fatalf("validateSpecificRepoSelection(repo-a): %v", err)
+	}
+}
+
 func TestSetupAndWriteCreatesConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "transferepo.config.yaml")

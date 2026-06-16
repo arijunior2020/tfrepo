@@ -127,7 +127,7 @@ Wizard interativo que guia a configuração completa da migração:
 
 1. Pergunta provider e namespace de **origem**
 2. Conecta na API e lista os repositórios disponíveis
-3. Exibe os repositórios para seleção interativa
+3. Permite migrar todos os repositórios ou selecionar repositórios específicos
 4. Pergunta provider e namespace de **destino**
 5. Gera o `transferepo.config.yaml` pronto para uso
 
