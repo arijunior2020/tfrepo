@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -84,8 +85,8 @@ func TestNewRootCommandRegistersScanWithConcurrencyFlag(t *testing.T) {
 	if flag == nil {
 		t.Fatal("scan command missing --concurrency flag")
 	}
-	if flag.DefValue != "4" {
-		t.Errorf("--concurrency default = %q, want %q", flag.DefValue, "4")
+	if flag.DefValue != strconv.Itoa(defaultScanConcurrency) {
+		t.Errorf("--concurrency default = %q, want %q", flag.DefValue, strconv.Itoa(defaultScanConcurrency))
 	}
 }
 
@@ -93,14 +94,17 @@ func TestNewRootCommandRegistersPlan(t *testing.T) {
 	exitCode := 0
 	root := newRootCommand(&exitCode)
 
-	if _, _, err := root.Find([]string{"plan"}); err != nil {
+	planCmd, _, err := root.Find([]string{"plan"})
+	if err != nil {
 		t.Fatalf("Find(plan): %v", err)
+	}
+	if planCmd.Use != "plan" {
+		t.Fatalf("Find(plan).Use = %q, want %q", planCmd.Use, "plan")
 	}
 }
 
 func TestExecuteScanReturnsExitCode1WhenConfigMissing(t *testing.T) {
 	dir := t.TempDir()
-	t.Chdir(dir)
 
 	exitCode := 0
 	root := newRootCommand(&exitCode)
