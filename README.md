@@ -187,6 +187,18 @@ Flags:
   -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
+### `tfrepo update`
+
+Verifica se há uma versão mais recente disponível no GitHub e, se houver,
+baixa e substitui o binário instalado automaticamente.
+
+```bash
+tfrepo update
+```
+
+Não requer nenhuma flag. O binário substituído é o mesmo que está em execução
+(`os.Executable()`). Em caso de erro de permissão, execute com `sudo`.
+
 ## Variáveis de ambiente
 
 | Variável        | Quando obrigatória                                          |

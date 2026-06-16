@@ -256,3 +256,16 @@ func TestNewRootCommandRegistersSetup(t *testing.T) {
 		t.Fatalf("Find(setup).Use = %q, want %q", setupCmd.Use, "setup")
 	}
 }
+
+func TestNewRootCommandRegistersUpdate(t *testing.T) {
+	exitCode := 0
+	root := newRootCommand(&exitCode)
+
+	updateCmd, _, err := root.Find([]string{"update"})
+	if err != nil {
+		t.Fatalf("Find(update): %v", err)
+	}
+	if updateCmd.Use != "update" {
+		t.Fatalf("Find(update).Use = %q, want %q", updateCmd.Use, "update")
+	}
+}
