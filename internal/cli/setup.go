@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"sort"
-	"syscall"
 
 	"github.com/arijunior2020/tfrepo/internal/config"
 	"github.com/arijunior2020/tfrepo/internal/core"
@@ -17,8 +15,7 @@ import (
 )
 
 // WizardInput holds the answers collected by the setup wizard.
-// SelectedRepos, if non-empty, becomes filters.include in the generated
-// config. An empty SelectedRepos means "all repos" (filters.include = ["*"]).
+// Empty SelectedRepos means "all repos" (filters.include = ["*"]).
 type WizardInput struct {
 	SourceProvider  string
 	SourceNamespace string
@@ -29,9 +26,6 @@ type WizardInput struct {
 	SelectedRepos   []string
 }
 
-// buildConfigYAML converts wizard answers into transferepo.config.yaml
-// content. Repos in SelectedRepos are sorted alphabetically for
-// determinism; an empty slice produces filters.include: ["*"].
 func buildConfigYAML(input WizardInput) ([]byte, error) {
 	include := []string{"*"}
 	if len(input.SelectedRepos) > 0 {
@@ -62,14 +56,7 @@ func buildConfigYAML(input WizardInput) ([]byte, error) {
 	return yaml.Marshal(cfg)
 }
 
-// runSetup runs the interactive setup wizard that guides the user through
-// configuring source and target providers, scanning available repositories,
-// and writing a transferepo.config.yaml file.
 func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) int {
-	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	// --- source form ---
 	var sourceProvider, sourceNamespace, sourceBaseURL string
 
 	sourceForm := huh.NewForm(
@@ -97,11 +84,13 @@ func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) 
 	)
 
 	if err := sourceForm.RunWithContext(ctx); err != nil {
-		fmt.Fprintln(stderr, "Operação cancelada.")
+		if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
+			return 0
+		}
+		fmt.Fprintln(stderr, err)
 		return 1
 	}
 
-	// --- scan ---
 	sourceProv, err := NewProvider(config.ProviderConfig{
 		Provider:  sourceProvider,
 		Namespace: sourceNamespace,
@@ -129,7 +118,6 @@ func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) 
 
 	fmt.Fprintf(stdout, "Encontrados: %s\n", countLabel(len(allRepos), "repositório", "repositórios"))
 
-	// --- repo selection ---
 	var selectedRepos []string
 	if len(allRepos) > 0 {
 		repoOptions := make([]huh.Option[string], len(allRepos))
@@ -148,12 +136,14 @@ func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) 
 		)
 
 		if err := repoForm.RunWithContext(ctx); err != nil {
-			fmt.Fprintln(stderr, "Operação cancelada.")
+			if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
+				return 0
+			}
+			fmt.Fprintln(stderr, err)
 			return 1
 		}
 	}
 
-	// --- target form ---
 	var targetProvider, targetNamespace, targetBaseURL string
 
 	targetForm := huh.NewForm(
@@ -181,11 +171,13 @@ func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) 
 	)
 
 	if err := targetForm.RunWithContext(ctx); err != nil {
-		fmt.Fprintln(stderr, "Operação cancelada.")
+		if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
+			return 0
+		}
+		fmt.Fprintln(stderr, err)
 		return 1
 	}
 
-	// --- overwrite check ---
 	if _, statErr := os.Stat(configPath); statErr == nil {
 		var overwrite bool
 		confirmForm := huh.NewForm(
@@ -197,7 +189,10 @@ func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) 
 		)
 
 		if err := confirmForm.RunWithContext(ctx); err != nil {
-			fmt.Fprintln(stderr, "Operação cancelada.")
+			if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
+				return 0
+			}
+			fmt.Fprintln(stderr, err)
 			return 1
 		}
 
@@ -218,8 +213,6 @@ func runSetup(ctx context.Context, configPath string, stdout, stderr io.Writer) 
 	}, configPath, stdout, stderr)
 }
 
-// setupAndWrite writes the config generated from input to configPath,
-// overwriting any existing file, and prints a one-line summary to stdout.
 func setupAndWrite(input WizardInput, configPath string, stdout, stderr io.Writer) int {
 	yml, err := buildConfigYAML(input)
 	if err != nil {
