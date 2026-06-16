@@ -76,7 +76,13 @@ target:
   namespace: meu-grupo
 ```
 
-**3. Configure os tokens via variáveis de ambiente:**
+**3. Configure os tokens de acesso:**
+
+```bash
+tfrepo configure
+```
+
+Ou via variáveis de ambiente (têm prioridade sobre o arquivo de credenciais):
 
 ```bash
 export GITHUB_TOKEN=ghp_...
@@ -121,6 +127,31 @@ mapping:                 # renomear repositórios no destino; padrão: mesmo nom
 
 ## Comandos
 
+### `tfrepo configure [provider]`
+
+Wizard interativo para configurar tokens de acesso pessoal. Salva os tokens em
+`~/.tfrepo/credentials` com permissões `0600`. Os tokens **nunca** são gravados
+no `transferepo.config.yaml` nem em logs.
+
+```
+Argumentos opcionais:
+  provider   provider a configurar: "github" ou "gitlab"
+             (sem argumento: configura todos os providers)
+```
+
+**Prioridade de resolução de token:**
+1. Variável de ambiente (`GITHUB_TOKEN` / `GITLAB_TOKEN`) — sempre tem prioridade
+2. Arquivo `~/.tfrepo/credentials`
+3. Erro com instrução para executar `tfrepo configure`
+
+**Exemplos:**
+
+```bash
+tfrepo configure           # configura GitHub e GitLab
+tfrepo configure github    # configura apenas GitHub
+tfrepo configure gitlab    # configura apenas GitLab
+```
+
 ### `tfrepo setup` (recomendado para novos usuários)
 
 Wizard interativo que guia a configuração completa da migração:
@@ -136,7 +167,7 @@ Flags:
   -c, --config string   arquivo de configuração a gerar (padrão: transferepo.config.yaml)
 ```
 
-Requer `GITHUB_TOKEN` e/ou `GITLAB_TOKEN` definidos antes de rodar.
+Requer tokens configurados via `tfrepo configure` ou variáveis de ambiente `GITHUB_TOKEN` / `GITLAB_TOKEN` antes de rodar.
 
 ### `tfrepo init`
 
