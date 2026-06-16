@@ -139,7 +139,7 @@ func extractTarGZ(r io.Reader, name string, dst io.Writer) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if filepath.Base(hdr.Name) == name {
+		if filepath.Base(hdr.Name) == name && hdr.Typeflag == tar.TypeReg {
 			if _, err := io.Copy(dst, tr); err != nil {
 				return false, err
 			}

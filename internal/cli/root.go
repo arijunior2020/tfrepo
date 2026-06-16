@@ -9,13 +9,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// programVersion is set at build time via ldflags -X. Must be var, not const.
+var programVersion = "0.1.0"
+
 const (
 	// defaultConfigPath is the default value of the --config flag,
 	// matching DEFAULT_CONFIG_PATH in apps/cli/src/cli.ts.
 	defaultConfigPath = "transferepo.config.yaml"
-
-	// programVersion matches PROGRAM_VERSION in apps/cli/src/cli.ts.
-	programVersion = "0.1.0"
 
 	// configFlagName is the name of the persistent --config/-c flag shared by
 	// every subcommand.

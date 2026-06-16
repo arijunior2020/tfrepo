@@ -13,7 +13,7 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w
+      - -s -w -X github.com/arijunior2020/tfrepo/internal/cli.programVersion={{ .Version }}
     goos:
       - linux
       - darwin
