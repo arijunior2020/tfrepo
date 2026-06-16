@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -25,6 +27,9 @@ const (
 	// defaultScanConcurrency is the default value of the --concurrency flag
 	// on "scan".
 	defaultScanConcurrency = 4
+
+	// dryRunFlagName is the name of the --dry-run flag on "migrate".
+	dryRunFlagName = "dry-run"
 )
 
 // Execute runs the tfrepo root command against os.Args and returns the
@@ -66,6 +71,8 @@ func newRootCommand(exitCode *int) *cobra.Command {
 	root.AddCommand(newInitCommand(exitCode))
 	root.AddCommand(newScanCommand(exitCode))
 	root.AddCommand(newPlanCommand(exitCode))
+	root.AddCommand(newMigrateCommand(exitCode))
+	root.AddCommand(newValidateCommand(exitCode))
 
 	return root
 }
@@ -118,6 +125,49 @@ func newPlanCommand(exitCode *int) *cobra.Command {
 				return err
 			}
 			*exitCode = runPlan(configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return nil
+		},
+	}
+}
+
+func newMigrateCommand(exitCode *int) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "Executa migration-plan.json, mirror-clonando cada repositório de origem e empurrando para o destino",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := cmd.Flags().GetString(configFlagName)
+			if err != nil {
+				return err
+			}
+			dryRun, err := cmd.Flags().GetBool(dryRunFlagName)
+			if err != nil {
+				return err
+			}
+			concurrency, err := cmd.Flags().GetInt(concurrencyFlagName)
+			if err != nil {
+				return err
+			}
+			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
+			defer stop()
+			*exitCode = runMigrate(ctx, configPath, dryRun, concurrency, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return nil
+		},
+	}
+	cmd.Flags().Bool(dryRunFlagName, false, "valida conectividade com o destino sem clonar nem empurrar repositórios")
+	cmd.Flags().Int(concurrencyFlagName, defaultScanConcurrency, "número de repositórios migrados em paralelo")
+	return cmd
+}
+
+func newValidateCommand(exitCode *int) *cobra.Command {
+	return &cobra.Command{
+		Use:   "validate",
+		Short: "Compara branches e tags entre origem e destino usando migration-plan.json",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := cmd.Flags().GetString(configFlagName)
+			if err != nil {
+				return err
+			}
+			*exitCode = runValidate(cmd.Context(), configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
 			return nil
 		},
 	}

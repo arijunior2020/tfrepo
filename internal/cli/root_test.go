@@ -147,3 +147,99 @@ func TestExecutePlanReturnsExitCode1WhenInventoryMissing(t *testing.T) {
 		t.Fatalf("exitCode = %d, want 1", exitCode)
 	}
 }
+
+func TestNewRootCommandRegistersMigrateWithFlags(t *testing.T) {
+	exitCode := 0
+	root := newRootCommand(&exitCode)
+
+	migrateCmd, _, err := root.Find([]string{"migrate"})
+	if err != nil {
+		t.Fatalf("Find(migrate): %v", err)
+	}
+	// cobra.Find retorna o root silenciosamente quando o subcomando não existe;
+	// verificar Use é obrigatório para detectar esse caso.
+	if migrateCmd.Use != "migrate" {
+		t.Fatalf("Find(migrate).Use = %q, want %q", migrateCmd.Use, "migrate")
+	}
+
+	dryRunFlag := migrateCmd.Flags().Lookup(dryRunFlagName)
+	if dryRunFlag == nil {
+		t.Fatal("migrate command missing --dry-run flag")
+	}
+	if dryRunFlag.DefValue != "false" {
+		t.Errorf("--dry-run default = %q, want %q", dryRunFlag.DefValue, "false")
+	}
+
+	concurrencyFlag := migrateCmd.Flags().Lookup(concurrencyFlagName)
+	if concurrencyFlag == nil {
+		t.Fatal("migrate command missing --concurrency flag")
+	}
+	if concurrencyFlag.DefValue != strconv.Itoa(defaultScanConcurrency) {
+		t.Errorf("--concurrency default = %q, want %q", concurrencyFlag.DefValue, strconv.Itoa(defaultScanConcurrency))
+	}
+}
+
+func TestNewRootCommandRegistersValidate(t *testing.T) {
+	exitCode := 0
+	root := newRootCommand(&exitCode)
+
+	validateCmd, _, err := root.Find([]string{"validate"})
+	if err != nil {
+		t.Fatalf("Find(validate): %v", err)
+	}
+	if validateCmd.Use != "validate" {
+		t.Fatalf("Find(validate).Use = %q, want %q", validateCmd.Use, "validate")
+	}
+}
+
+func TestExecuteMigrateReturnsExitCode1WhenPlanMissing(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	configPath := filepath.Join(dir, "transferepo.config.yaml")
+	configYAML := "source:\n  provider: github\n  namespace: my-org\ntarget:\n  provider: gitlab\n  namespace: my-group\n"
+	if err := os.WriteFile(configPath, []byte(configYAML), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	exitCode := 0
+	root := newRootCommand(&exitCode)
+
+	var stdout, stderr bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"migrate", "--config", configPath})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute: %v (stderr: %s)", err, stderr.String())
+	}
+	if exitCode != 1 {
+		t.Fatalf("exitCode = %d, want 1", exitCode)
+	}
+}
+
+func TestExecuteValidateReturnsExitCode1WhenPlanMissing(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	configPath := filepath.Join(dir, "transferepo.config.yaml")
+	configYAML := "source:\n  provider: github\n  namespace: my-org\ntarget:\n  provider: gitlab\n  namespace: my-group\n"
+	if err := os.WriteFile(configPath, []byte(configYAML), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	exitCode := 0
+	root := newRootCommand(&exitCode)
+
+	var stdout, stderr bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"validate", "--config", configPath})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute: %v (stderr: %s)", err, stderr.String())
+	}
+	if exitCode != 1 {
+		t.Fatalf("exitCode = %d, want 1", exitCode)
+	}
+}
