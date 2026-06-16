@@ -79,6 +79,7 @@ func newRootCommand(exitCode *int) *cobra.Command {
 	root.AddCommand(newMigrateCommand(exitCode))
 	root.AddCommand(newValidateCommand(exitCode))
 	root.AddCommand(newSetupCommand(exitCode))
+	root.AddCommand(newConfigureCommand(exitCode))
 	root.AddCommand(newUpdateCommand(exitCode))
 	root.AddCommand(newDestroyCommand(exitCode))
 
