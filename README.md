@@ -16,15 +16,16 @@ Baixe o binário para sua plataforma na página de
 descompacte e mova para um diretório no `$PATH`:
 
 ```bash
-# Linux x86_64
+# Linux x86_64 (ajuste VERSION para a versão desejada, ex: 0.1.0)
+VERSION=0.1.0
 curl -Lo tfrepo.tar.gz \
-  https://github.com/arijunior2020/tfrepo/releases/latest/download/tfrepo_Linux_x86_64.tar.gz
+  "https://github.com/arijunior2020/tfrepo/releases/download/v${VERSION}/tfrepo_${VERSION}_linux_amd64.tar.gz"
 tar xzf tfrepo.tar.gz tfrepo
 chmod +x tfrepo && sudo mv tfrepo /usr/local/bin/
 
 # macOS Apple Silicon
 curl -Lo tfrepo.tar.gz \
-  https://github.com/arijunior2020/tfrepo/releases/latest/download/tfrepo_Darwin_arm64.tar.gz
+  "https://github.com/arijunior2020/tfrepo/releases/download/v${VERSION}/tfrepo_${VERSION}_darwin_arm64.tar.gz"
 tar xzf tfrepo.tar.gz tfrepo
 chmod +x tfrepo && sudo mv tfrepo /usr/local/bin/
 ```
@@ -114,7 +115,7 @@ Lista os repositórios do namespace de origem e grava `inventory.json`.
 ```
 Flags:
   --concurrency int   repositórios processados em paralelo (padrão: 4)
-  --config string     arquivo de configuração (padrão: transferepo.config.yaml)
+  -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
 ### `tfrepo plan`
@@ -123,7 +124,7 @@ Aplica filtros e mapeamento sobre `inventory.json` e grava `migration-plan.json`
 
 ```
 Flags:
-  --config string   arquivo de configuração (padrão: transferepo.config.yaml)
+  -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
 ### `tfrepo migrate [--dry-run] [--concurrency N]`
@@ -135,7 +136,7 @@ Mirror-clona cada repositório da origem e empurra para o destino, gravando
 Flags:
   --dry-run           valida conectividade sem clonar nem empurrar (padrão: false)
   --concurrency int   repositórios migrados em paralelo (padrão: 4)
-  --config string     arquivo de configuração (padrão: transferepo.config.yaml)
+  -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
 ### `tfrepo validate`
@@ -148,7 +149,7 @@ Exit code `0` se tudo ok/ignorado; `1` se houver divergências — adequado para
 
 ```
 Flags:
-  --config string   arquivo de configuração (padrão: transferepo.config.yaml)
+  -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
 ## Variáveis de ambiente
