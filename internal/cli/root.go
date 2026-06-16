@@ -31,6 +31,10 @@ const (
 
 	// dryRunFlagName is the name of the --dry-run flag on "migrate".
 	dryRunFlagName = "dry-run"
+
+	// includeConfigFlagName is the name of the --include-config flag on
+	// "destroy".
+	includeConfigFlagName = "include-config"
 )
 
 // Execute runs the tfrepo root command against os.Args and returns the
@@ -76,6 +80,7 @@ func newRootCommand(exitCode *int) *cobra.Command {
 	root.AddCommand(newValidateCommand(exitCode))
 	root.AddCommand(newSetupCommand(exitCode))
 	root.AddCommand(newUpdateCommand(exitCode))
+	root.AddCommand(newDestroyCommand(exitCode))
 
 	return root
 }
@@ -193,4 +198,25 @@ func newSetupCommand(exitCode *int) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newDestroyCommand(exitCode *int) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "destroy",
+		Short: "Remove artefatos locais gerados pela migração",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := cmd.Flags().GetString(configFlagName)
+			if err != nil {
+				return err
+			}
+			includeConfig, err := cmd.Flags().GetBool(includeConfigFlagName)
+			if err != nil {
+				return err
+			}
+			*exitCode = runDestroy(configPath, includeConfig, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return nil
+		},
+	}
+	cmd.Flags().Bool(includeConfigFlagName, false, "também remove o arquivo de configuração")
+	return cmd
 }

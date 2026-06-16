@@ -269,3 +269,24 @@ func TestNewRootCommandRegistersUpdate(t *testing.T) {
 		t.Fatalf("Find(update).Use = %q, want %q", updateCmd.Use, "update")
 	}
 }
+
+func TestNewRootCommandRegistersDestroy(t *testing.T) {
+	exitCode := 0
+	root := newRootCommand(&exitCode)
+
+	destroyCmd, _, err := root.Find([]string{"destroy"})
+	if err != nil {
+		t.Fatalf("Find(destroy): %v", err)
+	}
+	if destroyCmd.Use != "destroy" {
+		t.Fatalf("Find(destroy).Use = %q, want %q", destroyCmd.Use, "destroy")
+	}
+
+	includeConfigFlag := destroyCmd.Flags().Lookup(includeConfigFlagName)
+	if includeConfigFlag == nil {
+		t.Fatal("destroy command missing --include-config flag")
+	}
+	if includeConfigFlag.DefValue != "false" {
+		t.Errorf("--include-config default = %q, want %q", includeConfigFlag.DefValue, "false")
+	}
+}

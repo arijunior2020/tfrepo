@@ -187,6 +187,25 @@ Flags:
   -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
+### `tfrepo destroy`
+
+Remove os artefatos locais gerados pela migração atual para iniciar uma nova
+migração no mesmo diretório:
+
+- `inventory.json`
+- `migration-plan.json`
+- `migration-report.json`
+- `validation-report.json`
+
+Por padrão, preserva o arquivo de configuração. Use `--include-config` para
+remover também o arquivo informado por `--config`.
+
+```
+Flags:
+  --include-config     também remove o arquivo de configuração
+  -c, --config string  arquivo de configuração (padrão: transferepo.config.yaml)
+```
+
 ### `tfrepo update`
 
 Verifica se há uma versão mais recente disponível no GitHub e, se houver,
