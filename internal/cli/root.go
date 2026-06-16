@@ -18,6 +18,13 @@ const (
 	// configFlagName is the name of the persistent --config/-c flag shared by
 	// every subcommand.
 	configFlagName = "config"
+
+	// concurrencyFlagName is the name of the --concurrency flag on "scan".
+	concurrencyFlagName = "concurrency"
+
+	// defaultScanConcurrency is the default value of the --concurrency flag
+	// on "scan".
+	defaultScanConcurrency = 4
 )
 
 // Execute runs the tfrepo root command against os.Args and returns the
@@ -57,6 +64,8 @@ func newRootCommand(exitCode *int) *cobra.Command {
 	root.PersistentFlags().StringP(configFlagName, "c", defaultConfigPath, "caminho do arquivo de configuração")
 
 	root.AddCommand(newInitCommand(exitCode))
+	root.AddCommand(newScanCommand(exitCode))
+	root.AddCommand(newPlanCommand(exitCode))
 
 	return root
 }
@@ -71,6 +80,44 @@ func newInitCommand(exitCode *int) *cobra.Command {
 				return err
 			}
 			*exitCode = runInit(configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return nil
+		},
+	}
+}
+
+func newScanCommand(exitCode *int) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "scan",
+		Short: "Lista os repositórios do namespace de origem e grava inventory.json",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := cmd.Flags().GetString(configFlagName)
+			if err != nil {
+				return err
+			}
+			concurrency, err := cmd.Flags().GetInt(concurrencyFlagName)
+			if err != nil {
+				return err
+			}
+			*exitCode = runScan(cmd.Context(), configPath, concurrency, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return nil
+		},
+	}
+
+	cmd.Flags().Int(concurrencyFlagName, defaultScanConcurrency, "número de repositórios processados em paralelo")
+
+	return cmd
+}
+
+func newPlanCommand(exitCode *int) *cobra.Command {
+	return &cobra.Command{
+		Use:   "plan",
+		Short: "Aplica filtros e mapeamento de inventory.json e grava migration-plan.json",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := cmd.Flags().GetString(configFlagName)
+			if err != nil {
+				return err
+			}
+			*exitCode = runPlan(configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
 			return nil
 		},
 	}
