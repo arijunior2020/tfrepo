@@ -197,7 +197,8 @@ tfrepo update
 ```
 
 Não requer nenhuma flag. O binário substituído é o mesmo que está em execução
-(`os.Executable()`). Em caso de erro de permissão, execute com `sudo`.
+(`os.Executable()`). Se ele estiver em um diretório protegido, como
+`/usr/local/bin`, o comando solicita `sudo` automaticamente.
 
 ## Variáveis de ambiente
 

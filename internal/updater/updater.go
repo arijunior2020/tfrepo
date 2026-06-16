@@ -77,27 +77,35 @@ func DownloadURL(repo, version, goos, goarch string) string {
 }
 
 func Install(ctx context.Context, client *http.Client, downloadURL, binaryPath string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	tmpPath, err := DownloadBinary(ctx, client, downloadURL, filepath.Base(binaryPath), filepath.Dir(binaryPath))
 	if err != nil {
 		return err
 	}
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	return os.Rename(tmpPath, binaryPath)
+}
+
+func DownloadBinary(ctx context.Context, client *http.Client, downloadURL, binaryName, dir string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return "", err
+	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
+		return "", fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	binaryName := filepath.Base(binaryPath)
-	tmpPath := binaryPath + ".new"
-
-	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	f, err := os.CreateTemp(dir, binaryName+".new-*")
 	if err != nil {
-		return err
+		return "", err
 	}
+	tmpPath := f.Name()
 
 	var found bool
 	if strings.HasSuffix(downloadURL, ".tar.gz") {
@@ -107,20 +115,24 @@ func Install(ctx context.Context, client *http.Client, downloadURL, binaryPath s
 		if rerr != nil {
 			_ = f.Close()
 			_ = os.Remove(tmpPath)
-			return rerr
+			return "", rerr
 		}
 		found, err = extractZip(data, binaryName, f)
 	}
 	_ = f.Close()
 	if err != nil {
 		_ = os.Remove(tmpPath)
-		return err
+		return "", err
 	}
 	if !found {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("binary %q not found in archive", binaryName)
+		return "", fmt.Errorf("binary %q not found in archive", binaryName)
 	}
-	return os.Rename(tmpPath, binaryPath)
+	if err := os.Chmod(tmpPath, 0755); err != nil {
+		_ = os.Remove(tmpPath)
+		return "", err
+	}
+	return tmpPath, nil
 }
 
 func extractTarGZ(r io.Reader, name string, dst io.Writer) (bool, error) {

@@ -196,6 +196,44 @@ func TestInstallZip(t *testing.T) {
 	}
 }
 
+func TestDownloadBinaryExtractsToTempDir(t *testing.T) {
+	content := []byte("#!/bin/sh\necho updated")
+	archive := makeTarGZ(t, "tfrepo", content)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(archive)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	tmpPath, err := DownloadBinary(context.Background(), http.DefaultClient, srv.URL+"/tfrepo_0.2.0_linux_amd64.tar.gz", "tfrepo", dir)
+	if err != nil {
+		t.Fatalf("DownloadBinary: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	if filepath.Dir(tmpPath) != dir {
+		t.Errorf("DownloadBinary path dir = %q, want %q", filepath.Dir(tmpPath), dir)
+	}
+
+	got, err := os.ReadFile(tmpPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("content = %q, want %q", got, content)
+	}
+
+	info, err := os.Stat(tmpPath)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if info.Mode()&0111 == 0 {
+		t.Error("binary is not executable")
+	}
+}
+
 func TestInstallBinaryNotInArchive(t *testing.T) {
 	archive := makeTarGZ(t, "other-binary", []byte("content"))
 
