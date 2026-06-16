@@ -1,5 +1,8 @@
 package security
 
+// credentialsPathFn é mutada pelos testes para injetar caminhos de arquivo temporários.
+// Não use t.Parallel() neste pacote — os testes compartilham este estado global.
+
 import (
 	"errors"
 	"os"

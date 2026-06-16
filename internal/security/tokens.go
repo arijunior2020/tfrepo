@@ -42,10 +42,11 @@ func ResolveToken(provider string) (string, error) {
 	}
 
 	creds, err := credentials.Load(credentialsPathFn())
-	if err == nil {
-		if token := creds.Token(provider); token != "" {
-			return token, nil
-		}
+	if err != nil {
+		return "", err
+	}
+	if token := creds.Token(provider); token != "" {
+		return token, nil
 	}
 
 	return "", &MissingTokenError{Provider: provider, EnvVar: envVar}
