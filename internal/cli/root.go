@@ -21,7 +21,8 @@ const (
 	// every subcommand.
 	configFlagName = "config"
 
-	// concurrencyFlagName is the name of the --concurrency flag on "scan".
+	// concurrencyFlagName is the name of the --concurrency flag on "scan" and
+	// "migrate".
 	concurrencyFlagName = "concurrency"
 
 	// defaultScanConcurrency is the default value of the --concurrency flag
@@ -167,7 +168,9 @@ func newValidateCommand(exitCode *int) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			*exitCode = runValidate(cmd.Context(), configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
+			defer stop()
+			*exitCode = runValidate(ctx, configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
 			return nil
 		},
 	}
