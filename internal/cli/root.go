@@ -26,7 +26,7 @@ const (
 	concurrencyFlagName = "concurrency"
 
 	// defaultScanConcurrency is the default value of the --concurrency flag
-	// on "scan".
+	// on "scan" and "migrate".
 	defaultScanConcurrency = 4
 
 	// dryRunFlagName is the name of the --dry-run flag on "migrate".
