@@ -14,8 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// WizardInput holds the answers collected by the setup wizard.
-// Empty SelectedRepos means "all repos" (filters.include = ["*"]).
+// WizardInput holds wizard answers; empty SelectedRepos means all repos (filters.include = ["*"]).
 type WizardInput struct {
 	SourceProvider  string
 	SourceNamespace string
