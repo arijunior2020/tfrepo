@@ -16,10 +16,6 @@ import (
 	"strings"
 )
 
-// LatestVersion queries the GitHub releases API and returns the latest
-// version string without the "v" prefix (e.g. "0.2.0").
-// baseURL should be "https://api.github.com" in production; tests inject
-// an httptest.Server URL.
 func LatestVersion(ctx context.Context, client *http.Client, baseURL, repo string) (string, error) {
 	url := fmt.Sprintf("%s/repos/%s/releases/latest", baseURL, repo)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -52,8 +48,6 @@ func LatestVersion(ctx context.Context, client *http.Client, baseURL, repo strin
 	return version, nil
 }
 
-// IsNewer reports whether candidate is strictly newer than current.
-// Both strings may optionally have a "v" prefix (e.g. "0.1.0" or "v0.1.0").
 func IsNewer(current, candidate string) (bool, error) {
 	cMaj, cMin, cPat, err := parseVersion(current)
 	if err != nil {
@@ -72,10 +66,6 @@ func IsNewer(current, candidate string) (bool, error) {
 	return nPat > cPat, nil
 }
 
-// DownloadURL returns the GitHub release asset URL for the given
-// repo/version/goos/goarch combination, matching the archive name template
-// in .goreleaser.yaml: <project>_<version>_<os>_<arch>.tar.gz (or .zip on
-// Windows).
 func DownloadURL(repo, version, goos, goarch string) string {
 	project := filepath.Base(repo)
 	ext := "tar.gz"
@@ -86,9 +76,6 @@ func DownloadURL(repo, version, goos, goarch string) string {
 	return fmt.Sprintf("https://github.com/%s/releases/download/v%s/%s", repo, version, filename)
 }
 
-// Install downloads the archive at downloadURL, extracts the binary whose
-// base name matches filepath.Base(binaryPath), and atomically replaces
-// binaryPath.
 func Install(ctx context.Context, client *http.Client, downloadURL, binaryPath string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
