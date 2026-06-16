@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -51,6 +53,28 @@ func TestRunConfigureSkipsEnvVarProviderSingleArg(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "GITHUB_TOKEN") {
 		t.Errorf("stdout = %q, want skip message mentioning GITHUB_TOKEN", stdout.String())
+	}
+}
+
+func TestRunConfigureFailsWhenCredentialsFileCorrupted(t *testing.T) {
+	dir := t.TempDir()
+	credPath := filepath.Join(dir, "credentials")
+	if err := os.WriteFile(credPath, []byte(":::invalid:::yaml:"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	old := configureCredPathFn
+	configureCredPathFn = func() string { return credPath }
+	t.Cleanup(func() { configureCredPathFn = old })
+
+	var stdout, stderr bytes.Buffer
+	// credentials.Load falha antes de chegar no loop de providers ou no huh
+	code := runConfigure(context.Background(), "github", &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runConfigure with corrupted credentials = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "credenciais") {
+		t.Errorf("stderr = %q, want error mentioning credentials", stderr.String())
 	}
 }
 

@@ -16,6 +16,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var configureCredPathFn = credentials.DefaultPath
+
 func newConfigureCommand(exitCode *int) *cobra.Command {
 	return &cobra.Command{
 		Use:   "configure [provider]",
@@ -40,7 +42,7 @@ func runConfigure(ctx context.Context, provider string, stdout, stderr io.Writer
 		return 1
 	}
 
-	credPath := credentials.DefaultPath()
+	credPath := configureCredPathFn()
 	creds, err := credentials.Load(credPath)
 	if err != nil {
 		fmt.Fprintln(stderr, "erro ao ler credenciais:", err)
