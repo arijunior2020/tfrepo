@@ -96,7 +96,6 @@ func TestBuildConfigYAMLWithBaseURL(t *testing.T) {
 }
 
 func TestSetupAndWriteCreatesConfigFile(t *testing.T) {
-	t.Chdir(t.TempDir())
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "transferepo.config.yaml")
 
@@ -120,7 +119,6 @@ func TestSetupAndWriteCreatesConfigFile(t *testing.T) {
 }
 
 func TestSetupAndWriteOverwritesExistingFile(t *testing.T) {
-	t.Chdir(t.TempDir())
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "transferepo.config.yaml")
 	if err := os.WriteFile(configPath, []byte("old content"), 0o644); err != nil {
@@ -138,7 +136,10 @@ func TestSetupAndWriteOverwritesExistingFile(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("setupAndWrite = %d, want 0", code)
 	}
-	got, _ := os.ReadFile(configPath)
+	got, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
 	if strings.Contains(string(got), "old content") {
 		t.Error("config file was not overwritten")
 	}
