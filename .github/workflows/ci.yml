@@ -16,5 +16,5 @@ jobs:
       - run: go vet ./...
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v1.64.8
       - run: go test ./... -race
