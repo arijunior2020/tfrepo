@@ -9,7 +9,25 @@ integridade e auditabilidade.
 
 ## Instalação
 
-### Binário pré-compilado (recomendado)
+### Script de instalação (recomendado)
+
+**Linux / macOS:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/arijunior2020/tfrepo/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/arijunior2020/tfrepo/main/install.ps1 | iex
+```
+
+O script detecta o sistema operacional e a arquitetura automaticamente, baixa o binário correto da última release e instala em `/usr/local/bin` (Linux/macOS) ou `%LOCALAPPDATA%\Programs\tfrepo` (Windows).
+
+Para instalar em um diretório personalizado, defina `TFREPO_INSTALL_DIR` antes de executar.
+
+### Binário pré-compilado (manual)
 
 Baixe o binário para sua plataforma na página de
 [Releases](https://github.com/arijunior2020/tfrepo/releases/latest),
