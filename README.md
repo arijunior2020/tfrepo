@@ -121,6 +121,23 @@ mapping:                 # renomear repositórios no destino; padrão: mesmo nom
 
 ## Comandos
 
+### `tfrepo setup` (recomendado para novos usuários)
+
+Wizard interativo que guia a configuração completa da migração:
+
+1. Pergunta provider e namespace de **origem**
+2. Conecta na API e lista os repositórios disponíveis
+3. Exibe os repositórios para seleção interativa
+4. Pergunta provider e namespace de **destino**
+5. Gera o `transferepo.config.yaml` pronto para uso
+
+```
+Flags:
+  -c, --config string   arquivo de configuração a gerar (padrão: transferepo.config.yaml)
+```
+
+Requer `GITHUB_TOKEN` e/ou `GITLAB_TOKEN` definidos antes de rodar.
+
 ### `tfrepo init`
 
 Gera um `transferepo.config.yaml` de exemplo no diretório atual.

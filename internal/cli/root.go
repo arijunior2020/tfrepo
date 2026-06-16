@@ -74,6 +74,7 @@ func newRootCommand(exitCode *int) *cobra.Command {
 	root.AddCommand(newPlanCommand(exitCode))
 	root.AddCommand(newMigrateCommand(exitCode))
 	root.AddCommand(newValidateCommand(exitCode))
+	root.AddCommand(newSetupCommand(exitCode))
 
 	return root
 }
@@ -171,6 +172,23 @@ func newValidateCommand(exitCode *int) *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 			*exitCode = runValidate(ctx, configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return nil
+		},
+	}
+}
+
+func newSetupCommand(exitCode *int) *cobra.Command {
+	return &cobra.Command{
+		Use:   "setup",
+		Short: "Wizard interativo: escaneia a origem e gera transferepo.config.yaml",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := cmd.Flags().GetString(configFlagName)
+			if err != nil {
+				return err
+			}
+			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
+			defer stop()
+			*exitCode = runSetup(ctx, configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
 			return nil
 		},
 	}

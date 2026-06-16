@@ -243,3 +243,16 @@ func TestExecuteValidateReturnsExitCode1WhenPlanMissing(t *testing.T) {
 		t.Fatalf("exitCode = %d, want 1", exitCode)
 	}
 }
+
+func TestNewRootCommandRegistersSetup(t *testing.T) {
+	exitCode := 0
+	root := newRootCommand(&exitCode)
+
+	setupCmd, _, err := root.Find([]string{"setup"})
+	if err != nil {
+		t.Fatalf("Find(setup): %v", err)
+	}
+	if setupCmd.Use != "setup" {
+		t.Fatalf("Find(setup).Use = %q, want %q", setupCmd.Use, "setup")
+	}
+}
