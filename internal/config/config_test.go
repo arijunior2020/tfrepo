@@ -172,7 +172,7 @@ func TestLoadInvalidYAML(t *testing.T) {
 		t.Fatal("Load() error = nil, want error")
 	}
 
-	requireConfigError(t, err)
+	_ = requireConfigError(t, err)
 }
 
 func TestLoadMissingFile(t *testing.T) {
@@ -184,5 +184,5 @@ func TestLoadMissingFile(t *testing.T) {
 		t.Fatal("Load() error = nil, want error")
 	}
 
-	requireConfigError(t, err)
+	_ = requireConfigError(t, err)
 }

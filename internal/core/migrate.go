@@ -130,7 +130,7 @@ func migrateTask(ctx context.Context, task MigrationTask, providers MigrateProvi
 	if err != nil {
 		return err
 	}
-	defer workspace.Cleanup()
+	defer func() { _ = workspace.Cleanup() }()
 
 	repoDir := filepath.Join(workspace.Path, migrateRepoDirName)
 

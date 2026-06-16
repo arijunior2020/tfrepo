@@ -51,7 +51,7 @@ func runMigrate(ctx context.Context, configPath string, dryRun bool, concurrency
 // workspaces criados e não limpos no cancelamento do context sejam removidos.
 func migrateAndWrite(ctx context.Context, plan core.MigrationPlan, providers core.MigrateProviders, dryRun bool, concurrency int, stdout, stderr io.Writer) int {
 	workspaces := security.NewManager()
-	defer workspaces.CleanupAll()
+	defer func() { _ = workspaces.CleanupAll() }()
 
 	report, err := core.Migrate(ctx, plan, providers, core.MigrateOptions{
 		DryRun:      dryRun,
