@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -598,5 +599,107 @@ func TestGitHubCreateRepository_OwnNamespace(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("CreateRepository = %+v, want %+v", got, want)
+	}
+}
+
+func TestGitHubProviderListLabels(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/my-org/repo-a/labels", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"name":"bug","color":"d73a4a","description":"Something is wrong"},{"name":"enhancement","color":"a2eeef","description":""}]`)
+	})
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+
+	labels, err := p.ListLabels(context.Background(), "my-org", "repo-a")
+	if err != nil {
+		t.Fatalf("ListLabels: %v", err)
+	}
+	if len(labels) != 2 {
+		t.Fatalf("len(labels) = %d, want 2", len(labels))
+	}
+	if labels[0].Name != "bug" || labels[0].Color != "d73a4a" || labels[0].Description != "Something is wrong" {
+		t.Errorf("labels[0] = %+v", labels[0])
+	}
+	if labels[1].Name != "enhancement" || labels[1].Color != "a2eeef" {
+		t.Errorf("labels[1] = %+v", labels[1])
+	}
+}
+
+func TestGitHubProviderCreateLabel(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/my-org/repo-a/labels", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"name":"bug","color":"d73a4a","description":"Something is wrong"}`)
+	})
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+
+	got, err := p.CreateLabel(context.Background(), "my-org", "repo-a", Label{Name: "bug", Color: "d73a4a", Description: "Something is wrong"})
+	if err != nil {
+		t.Fatalf("CreateLabel: %v", err)
+	}
+	if got.Name != "bug" || got.Color != "d73a4a" {
+		t.Errorf("got %+v", got)
+	}
+}
+
+func TestGitHubProviderListMilestones(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/my-org/repo-a/milestones", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("state") != "all" {
+			http.Error(w, "expected ?state=all", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"number":3,"title":"v1.0","description":"First stable release","state":"open","due_on":null}]`)
+	})
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+
+	milestones, err := p.ListMilestones(context.Background(), "my-org", "repo-a")
+	if err != nil {
+		t.Fatalf("ListMilestones: %v", err)
+	}
+	if len(milestones) != 1 {
+		t.Fatalf("len = %d, want 1", len(milestones))
+	}
+	ms := milestones[0]
+	if ms.ExternalID != 3 || ms.Title != "v1.0" || ms.Description != "First stable release" {
+		t.Errorf("milestones[0] = %+v", ms)
+	}
+	if ms.State != MilestoneStateOpen {
+		t.Errorf("State = %q, want open", ms.State)
+	}
+	if ms.DueDate != nil {
+		t.Errorf("DueDate should be nil, got %v", ms.DueDate)
+	}
+}
+
+func TestGitHubProviderCreateMilestone(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/my-org/repo-a/milestones", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"number":7,"title":"v1.0","description":"First stable release","state":"open","due_on":null}`)
+	})
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+
+	got, err := p.CreateMilestone(context.Background(), "my-org", "repo-a", Milestone{
+		Title:       "v1.0",
+		Description: "First stable release",
+		State:       MilestoneStateOpen,
+	})
+	if err != nil {
+		t.Fatalf("CreateMilestone: %v", err)
+	}
+	if got.ExternalID != 7 || got.Title != "v1.0" {
+		t.Errorf("got %+v", got)
 	}
 }

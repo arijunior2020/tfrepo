@@ -370,20 +370,114 @@ func (p *GitHubProvider) CreateRepository(ctx context.Context, namespace string,
 	return p.toRepositorySummary(data, namespace), nil
 }
 
+// ListLabels returns all labels defined on the repository.
 func (p *GitHubProvider) ListLabels(ctx context.Context, namespace, repo string) ([]Label, error) {
-	return nil, fmt.Errorf("not implemented")
+	var labels []Label
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		page, resp, err := p.client.Issues.ListLabels(ctx, namespace, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("list labels for %s/%s: %w", namespace, repo, err)
+		}
+		for _, l := range page {
+			labels = append(labels, Label{
+				Name:        l.GetName(),
+				Description: l.GetDescription(),
+				Color:       l.GetColor(),
+			})
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return labels, nil
 }
 
+// CreateLabel creates a new label on the repository.
 func (p *GitHubProvider) CreateLabel(ctx context.Context, namespace, repo string, label Label) (Label, error) {
-	return Label{}, fmt.Errorf("not implemented")
+	input := &github.Label{
+		Name:        github.Ptr(label.Name),
+		Description: github.Ptr(label.Description),
+		Color:       github.Ptr(label.Color),
+	}
+	created, _, err := p.client.Issues.CreateLabel(ctx, namespace, repo, input)
+	if err != nil {
+		return Label{}, fmt.Errorf("create label %q in %s/%s: %w", label.Name, namespace, repo, err)
+	}
+	return Label{
+		Name:        created.GetName(),
+		Description: created.GetDescription(),
+		Color:       created.GetColor(),
+	}, nil
 }
 
+// ListMilestones returns all milestones (open and closed) for the repository.
 func (p *GitHubProvider) ListMilestones(ctx context.Context, namespace, repo string) ([]Milestone, error) {
-	return nil, fmt.Errorf("not implemented")
+	var milestones []Milestone
+	opts := &github.MilestoneListOptions{
+		State:       "all",
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		page, resp, err := p.client.Issues.ListMilestones(ctx, namespace, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("list milestones for %s/%s: %w", namespace, repo, err)
+		}
+		for _, m := range page {
+			ms := Milestone{
+				ExternalID:  int64(m.GetNumber()),
+				Title:       m.GetTitle(),
+				Description: m.GetDescription(),
+				State:       MilestoneStateOpen,
+			}
+			if m.GetState() == "closed" {
+				ms.State = MilestoneStateClosed
+			}
+			if duo := m.GetDueOn(); !duo.IsZero() {
+				t := duo.Time
+				ms.DueDate = &t
+			}
+			milestones = append(milestones, ms)
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return milestones, nil
 }
 
+// CreateMilestone creates a new milestone on the repository.
+// ExternalID in the returned Milestone reflects the newly assigned milestone number.
 func (p *GitHubProvider) CreateMilestone(ctx context.Context, namespace, repo string, m Milestone) (Milestone, error) {
-	return Milestone{}, fmt.Errorf("not implemented")
+	state := string(m.State)
+	input := &github.Milestone{
+		Title:       github.Ptr(m.Title),
+		Description: github.Ptr(m.Description),
+		State:       github.Ptr(state),
+	}
+	if m.DueDate != nil {
+		input.DueOn = &github.Timestamp{Time: *m.DueDate}
+	}
+	created, _, err := p.client.Issues.CreateMilestone(ctx, namespace, repo, input)
+	if err != nil {
+		return Milestone{}, fmt.Errorf("create milestone %q in %s/%s: %w", m.Title, namespace, repo, err)
+	}
+	result := Milestone{
+		ExternalID:  int64(created.GetNumber()),
+		Title:       created.GetTitle(),
+		Description: created.GetDescription(),
+		State:       MilestoneStateOpen,
+	}
+	if created.GetState() == "closed" {
+		result.State = MilestoneStateClosed
+	}
+	if duo := created.GetDueOn(); !duo.IsZero() {
+		t := duo.Time
+		result.DueDate = &t
+	}
+	return result, nil
 }
 
 // Compile-time check that GitHubProvider implements RepositoryProvider.
