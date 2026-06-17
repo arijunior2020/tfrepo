@@ -806,6 +806,85 @@ func TestGitHubProviderCreateIssue(t *testing.T) {
 	}
 }
 
+func TestGitHubProviderListPullRequests(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/myorg/myrepo/pulls", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("state") != "open" {
+			t.Errorf("state = %q, want %q", r.URL.Query().Get("state"), "open")
+		}
+		writeJSON(t, w, []*github.PullRequest{
+			{
+				Number: github.Ptr(3),
+				Title:  github.Ptr("Add feature"),
+				Body:   github.Ptr("body text"),
+				State:  github.Ptr("open"),
+				Head:   &github.PullRequestBranch{Ref: github.Ptr("feature/add")},
+				Base:   &github.PullRequestBranch{Ref: github.Ptr("main")},
+			},
+		})
+	})
+
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+	prs, err := p.ListPullRequests(t.Context(), "myorg", "myrepo")
+	if err != nil {
+		t.Fatalf("ListPullRequests: %v", err)
+	}
+	if len(prs) != 1 {
+		t.Fatalf("len(prs) = %d, want 1", len(prs))
+	}
+	got := prs[0]
+	if got.ExternalID != 3 {
+		t.Errorf("ExternalID = %d, want 3", got.ExternalID)
+	}
+	if got.Title != "Add feature" {
+		t.Errorf("Title = %q, want %q", got.Title, "Add feature")
+	}
+	if got.SourceBranch != "feature/add" {
+		t.Errorf("SourceBranch = %q, want feature/add", got.SourceBranch)
+	}
+	if got.TargetBranch != "main" {
+		t.Errorf("TargetBranch = %q, want main", got.TargetBranch)
+	}
+	if got.State != "open" {
+		t.Errorf("State = %q, want open", got.State)
+	}
+}
+
+func TestGitHubProviderCreatePullRequest(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/myorg/myrepo/pulls", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, &github.PullRequest{
+			Number: github.Ptr(10),
+			Title:  github.Ptr("Created PR"),
+			Body:   github.Ptr("body"),
+			State:  github.Ptr("open"),
+			Head:   &github.PullRequestBranch{Ref: github.Ptr("feature/new")},
+			Base:   &github.PullRequestBranch{Ref: github.Ptr("main")},
+		})
+	})
+
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+	result, err := p.CreatePullRequest(t.Context(), "myorg", "myrepo", PullRequest{
+		Title:        "Created PR",
+		Body:         "body",
+		State:        "open",
+		SourceBranch: "feature/new",
+		TargetBranch: "main",
+	})
+	if err != nil {
+		t.Fatalf("CreatePullRequest: %v", err)
+	}
+	if result.ExternalID != 10 {
+		t.Errorf("ExternalID = %d, want 10", result.ExternalID)
+	}
+	if result.SourceBranch != "feature/new" {
+		t.Errorf("SourceBranch = %q, want feature/new", result.SourceBranch)
+	}
+	if result.State != "open" {
+		t.Errorf("State = %q, want open", result.State)
+	}
+}
+
 func TestGitHubProviderCreateIssueOpen(t *testing.T) {
 	editCalled := false
 

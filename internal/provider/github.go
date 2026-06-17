@@ -556,16 +556,54 @@ func (p *GitHubProvider) CreateIssue(ctx context.Context, namespace, repo string
 	return githubIssueToIssue(created), nil
 }
 
+// githubPRtoPullRequest maps a go-github PullRequest onto the provider-neutral
+// PullRequest.
+func githubPRtoPullRequest(pr *github.PullRequest) PullRequest {
+	return PullRequest{
+		ExternalID:   int64(pr.GetNumber()),
+		Title:        pr.GetTitle(),
+		Body:         pr.GetBody(),
+		State:        pr.GetState(),
+		SourceBranch: pr.GetHead().GetRef(),
+		TargetBranch: pr.GetBase().GetRef(),
+	}
+}
+
 // ListPullRequests returns open pull requests for the repository.
-// Not yet implemented — will be added in Plan 10 (migrate-prs).
-func (p *GitHubProvider) ListPullRequests(_ context.Context, _, _ string) ([]PullRequest, error) {
-	panic("not implemented")
+func (p *GitHubProvider) ListPullRequests(ctx context.Context, namespace, repo string) ([]PullRequest, error) {
+	var prs []PullRequest
+	opts := &github.PullRequestListOptions{
+		State:       "open",
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		page, resp, err := p.client.PullRequests.List(ctx, namespace, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("list pull requests for %s/%s: %w", namespace, repo, err)
+		}
+		for _, pr := range page {
+			prs = append(prs, githubPRtoPullRequest(pr))
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return prs, nil
 }
 
 // CreatePullRequest creates a pull request on the target repository.
-// Not yet implemented — will be added in Plan 10 (migrate-prs).
-func (p *GitHubProvider) CreatePullRequest(_ context.Context, _, _ string, _ PullRequest) (PullRequest, error) {
-	panic("not implemented")
+func (p *GitHubProvider) CreatePullRequest(ctx context.Context, namespace, repo string, pr PullRequest) (PullRequest, error) {
+	created, _, err := p.client.PullRequests.Create(ctx, namespace, repo, &github.NewPullRequest{
+		Title: github.Ptr(pr.Title),
+		Body:  github.Ptr(pr.Body),
+		Head:  github.Ptr(pr.SourceBranch),
+		Base:  github.Ptr(pr.TargetBranch),
+	})
+	if err != nil {
+		return PullRequest{}, fmt.Errorf("create pull request %q in %s/%s: %w", pr.Title, namespace, repo, err)
+	}
+	return githubPRtoPullRequest(created), nil
 }
 
 // Compile-time check that GitHubProvider implements RepositoryProvider.
