@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -139,31 +140,37 @@ func migrateTask(ctx context.Context, task MigrationTask, providers MigrateProvi
 		return err
 	}
 
-	if err := ensureTargetRepository(ctx, providers.Target, task); err != nil {
-		return err
-	}
-
-	targetURL := providers.Target.GetAuthenticatedCloneURL(task.Target.Namespace, task.Target.Repo)
-	return security.Push(ctx, repoDir, targetURL)
-}
-
-// ensureTargetRepository creates task's target repository if it doesn't
-// already exist.
-func ensureTargetRepository(ctx context.Context, target provider.RepositoryProvider, task MigrationTask) error {
-	existing, err := target.ListRepositories(ctx, task.Target.Namespace)
+	actualRepo, err := ensureTargetRepository(ctx, providers.Target, task)
 	if err != nil {
 		return err
 	}
 
+	targetURL := providers.Target.GetAuthenticatedCloneURL(task.Target.Namespace, actualRepo)
+	return security.Push(ctx, repoDir, targetURL)
+}
+
+// ensureTargetRepository creates task's target repository if it doesn't
+// already exist. It returns the actual stored name, which may differ in case
+// from task.Target.Repo when the provider normalises paths (e.g. GitLab
+// lowercases slugs).
+func ensureTargetRepository(ctx context.Context, target provider.RepositoryProvider, task MigrationTask) (string, error) {
+	existing, err := target.ListRepositories(ctx, task.Target.Namespace)
+	if err != nil {
+		return "", err
+	}
+
 	for _, repo := range existing {
-		if repo.Name == task.Target.Repo {
-			return nil
+		if strings.EqualFold(repo.Name, task.Target.Repo) {
+			return repo.Name, nil
 		}
 	}
 
-	_, err = target.CreateRepository(ctx, task.Target.Namespace, provider.CreateRepositoryInput{
+	created, err := target.CreateRepository(ctx, task.Target.Namespace, provider.CreateRepositoryInput{
 		Name:       task.Target.Repo,
 		Visibility: migrateTargetVisibility,
 	})
-	return err
+	if err != nil {
+		return "", err
+	}
+	return created.Name, nil
 }
