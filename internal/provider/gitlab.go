@@ -569,5 +569,15 @@ func (p *GitLabProvider) CreateMilestone(ctx context.Context, namespace, repo st
 	return result, nil
 }
 
+// ListIssues is not yet implemented for GitLabProvider.
+func (p *GitLabProvider) ListIssues(_ context.Context, _, _ string) ([]Issue, error) {
+	panic("not implemented")
+}
+
+// CreateIssue is not yet implemented for GitLabProvider.
+func (p *GitLabProvider) CreateIssue(_ context.Context, _, _ string, _ Issue) (Issue, error) {
+	panic("not implemented")
+}
+
 // Compile-time check that GitLabProvider implements RepositoryProvider.
 var _ RepositoryProvider = (*GitLabProvider)(nil)

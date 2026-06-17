@@ -53,6 +53,14 @@ func (f *fakeMigrateCliProvider) CreateMilestone(_ context.Context, _, _ string,
 	return provider.Milestone{}, errors.New("not implemented")
 }
 
+func (f *fakeMigrateCliProvider) ListIssues(_ context.Context, _, _ string) ([]provider.Issue, error) {
+	panic("not implemented")
+}
+
+func (f *fakeMigrateCliProvider) CreateIssue(_ context.Context, _, _ string, _ provider.Issue) (provider.Issue, error) {
+	panic("not implemented")
+}
+
 const baseMigrateConfigYAML = `source:
   provider: github
   namespace: my-org

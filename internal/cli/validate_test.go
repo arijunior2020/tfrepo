@@ -52,6 +52,14 @@ func (f *fakeValidateCliProvider) CreateMilestone(_ context.Context, _, _ string
 	return provider.Milestone{}, errors.New("not implemented")
 }
 
+func (f *fakeValidateCliProvider) ListIssues(_ context.Context, _, _ string) ([]provider.Issue, error) {
+	panic("not implemented")
+}
+
+func (f *fakeValidateCliProvider) CreateIssue(_ context.Context, _, _ string, _ provider.Issue) (provider.Issue, error) {
+	panic("not implemented")
+}
+
 const baseValidateConfigYAML = `source:
   provider: github
   namespace: my-org

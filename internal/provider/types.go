@@ -83,4 +83,8 @@ type RepositoryProvider interface {
 	CreateLabel(ctx context.Context, namespace, repo string, label Label) (Label, error)
 	ListMilestones(ctx context.Context, namespace, repo string) ([]Milestone, error)
 	CreateMilestone(ctx context.Context, namespace, repo string, m Milestone) (Milestone, error)
+
+	// Issues (tfrepo migrate-issues)
+	ListIssues(ctx context.Context, namespace, repo string) ([]Issue, error)
+	CreateIssue(ctx context.Context, namespace, repo string, issue Issue) (Issue, error)
 }

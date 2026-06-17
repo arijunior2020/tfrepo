@@ -63,6 +63,14 @@ func (f *fakeValidateProvider) CreateMilestone(ctx context.Context, namespace, r
 	return provider.Milestone{}, errors.New("not implemented")
 }
 
+func (f *fakeValidateProvider) ListIssues(_ context.Context, _, _ string) ([]provider.Issue, error) {
+	panic("not implemented")
+}
+
+func (f *fakeValidateProvider) CreateIssue(_ context.Context, _, _ string, _ provider.Issue) (provider.Issue, error) {
+	panic("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeValidateProvider)(nil)
 
 func baseValidatePlan() MigrationPlan {

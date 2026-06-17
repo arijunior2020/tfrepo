@@ -480,5 +480,15 @@ func (p *GitHubProvider) CreateMilestone(ctx context.Context, namespace, repo st
 	return result, nil
 }
 
+// ListIssues is not yet implemented for GitHubProvider.
+func (p *GitHubProvider) ListIssues(_ context.Context, _, _ string) ([]Issue, error) {
+	panic("not implemented")
+}
+
+// CreateIssue is not yet implemented for GitHubProvider.
+func (p *GitHubProvider) CreateIssue(_ context.Context, _, _ string, _ Issue) (Issue, error) {
+	panic("not implemented")
+}
+
 // Compile-time check that GitHubProvider implements RepositoryProvider.
 var _ RepositoryProvider = (*GitHubProvider)(nil)
