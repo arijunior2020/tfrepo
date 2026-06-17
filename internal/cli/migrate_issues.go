@@ -60,7 +60,7 @@ func runMigrateIssuesWithProviders(ctx context.Context, _ string, stdout, stderr
 		return 1
 	}
 
-	milestoneMapsByTask := buildMilestoneMapsByTask()
+	milestoneMapsByTask := buildMilestoneMapsByTask(stderr)
 
 	report, err := core.MigrateIssues(ctx, plan, core.IssuesMigrateProviders{Source: source, Target: target}, milestoneMapsByTask)
 	if err != nil {
@@ -95,13 +95,14 @@ func runMigrateIssuesWithProviders(ctx context.Context, _ string, stdout, stderr
 
 // buildMilestoneMapsByTask reads labels-report.json (if present) and returns
 // a task-ID-keyed map of MilestoneIDMap for milestone translation.
-// A missing file is silently ignored.
-func buildMilestoneMapsByTask() map[string]core.MilestoneIDMap {
+// A missing file is silently ignored; any other read/parse error is logged to stderr.
+func buildMilestoneMapsByTask(stderr io.Writer) map[string]core.MilestoneIDMap {
 	var labelsReport core.LabelsReport
 	if err := core.ReadJSON(labelsReportPath, &labelsReport); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
+		fmt.Fprintf(stderr, "warning: could not read %s, milestone translation disabled: %v\n", labelsReportPath, err)
 		return nil
 	}
 	m := make(map[string]core.MilestoneIDMap, len(labelsReport.Results))
