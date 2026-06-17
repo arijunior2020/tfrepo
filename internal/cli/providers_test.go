@@ -32,7 +32,7 @@ func TestNewProviderGitLab(t *testing.T) {
 
 func TestNewProviderMissingTokenReturnsError(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "")
-
+	t.Setenv("HOME", t.TempDir()) // ensures ~/.tfrepo/credentials does not exist
 	_, err := NewProvider(config.ProviderConfig{Provider: "github", Namespace: "my-org"})
 	if err == nil {
 		t.Fatal("NewProvider() error = nil, want error")
