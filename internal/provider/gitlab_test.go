@@ -786,3 +786,128 @@ func TestGitLabProviderCreateMilestone_Closed(t *testing.T) {
 		t.Errorf("ExternalID = %d, want 10", got.ExternalID)
 	}
 }
+
+func TestGitLabProviderListIssues(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/mygroup%2Fmyrepo/issues", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[`+
+			`{"id":100,"iid":1,"title":"First issue","description":"Body one","state":"opened","labels":["enhancement"],"milestone":null},`+
+			`{"id":101,"iid":2,"title":"Second issue","description":"Body two","state":"closed","labels":[],"milestone":null}`+
+			`]`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	issues, err := p.ListIssues(context.Background(), "mygroup", "myrepo")
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	if len(issues) != 2 {
+		t.Fatalf("len = %d, want 2", len(issues))
+	}
+
+	// ExternalID must be IID (project-scoped), not the global ID.
+	if issues[0].ExternalID != 1 {
+		t.Errorf("issues[0].ExternalID = %d, want 1 (IID)", issues[0].ExternalID)
+	}
+	// "opened" must be normalised to "open".
+	if issues[0].State != "open" {
+		t.Errorf("issues[0].State = %q, want %q", issues[0].State, "open")
+	}
+	if len(issues[0].Labels) != 1 || issues[0].Labels[0] != "enhancement" {
+		t.Errorf("issues[0].Labels = %v, want [enhancement]", issues[0].Labels)
+	}
+	if issues[1].ExternalID != 2 {
+		t.Errorf("issues[1].ExternalID = %d, want 2", issues[1].ExternalID)
+	}
+	if issues[1].State != "closed" {
+		t.Errorf("issues[1].State = %q, want %q", issues[1].State, "closed")
+	}
+}
+
+func TestGitLabProviderCreateIssue(t *testing.T) {
+	updateCalled := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/mygroup%2Fmyrepo/issues", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"id":50,"iid":5,"title":"New issue","description":"","state":"opened","labels":[],"milestone":null}`)
+	})
+	mux.HandleFunc("/api/v4/projects/mygroup%2Fmyrepo/issues/5", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		updateCalled = true
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":50,"iid":5,"title":"New issue","description":"","state":"closed","labels":[],"milestone":null}`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	result, err := p.CreateIssue(context.Background(), "mygroup", "myrepo", Issue{
+		Title: "New issue",
+		State: "closed",
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if !updateCalled {
+		t.Error("UpdateIssue was not called for a closed issue")
+	}
+	if result.State != "closed" {
+		t.Errorf("State = %q, want %q", result.State, "closed")
+	}
+	if result.ExternalID != 5 {
+		t.Errorf("ExternalID = %d, want 5", result.ExternalID)
+	}
+}
+
+func TestGitLabProviderCreateIssueOpen(t *testing.T) {
+	updateCalled := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/mygroup%2Fmyrepo/issues", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"id":50,"iid":5,"title":"Open issue","description":"","state":"opened","labels":[],"milestone":null}`)
+	})
+	mux.HandleFunc("/api/v4/projects/mygroup%2Fmyrepo/issues/5", func(w http.ResponseWriter, r *http.Request) {
+		updateCalled = true
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":50,"iid":5,"title":"Open issue","description":"","state":"opened","labels":[],"milestone":null}`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	result, err := p.CreateIssue(context.Background(), "mygroup", "myrepo", Issue{
+		Title: "Open issue",
+		State: "open",
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if updateCalled {
+		t.Error("UpdateIssue must NOT be called for an open issue")
+	}
+	if result.State != "open" {
+		t.Errorf("State = %q, want %q", result.State, "open")
+	}
+	if result.ExternalID != 5 {
+		t.Errorf("ExternalID = %d, want 5", result.ExternalID)
+	}
+}

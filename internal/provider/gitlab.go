@@ -569,14 +569,86 @@ func (p *GitLabProvider) CreateMilestone(ctx context.Context, namespace, repo st
 	return result, nil
 }
 
-// ListIssues is not yet implemented for GitLabProvider.
-func (p *GitLabProvider) ListIssues(_ context.Context, _, _ string) ([]Issue, error) {
-	panic("not implemented")
+// gitlabIssueToIssue maps a GitLab API issue to the provider-neutral Issue
+// type. It normalises "opened" → "open" and copies labels and milestone ID.
+func gitlabIssueToIssue(i *gitlab.Issue) Issue {
+	iss := Issue{
+		ExternalID: i.IID,
+		Title:      i.Title,
+		Body:       i.Description,
+		State:      "open",
+	}
+	if i.State == "closed" {
+		iss.State = "closed"
+	}
+	for _, l := range i.Labels {
+		iss.Labels = append(iss.Labels, l)
+	}
+	if i.Milestone != nil {
+		id := i.Milestone.ID
+		iss.MilestoneExternalID = &id
+	}
+	return iss
 }
 
-// CreateIssue is not yet implemented for GitLabProvider.
-func (p *GitLabProvider) CreateIssue(_ context.Context, _, _ string, _ Issue) (Issue, error) {
-	panic("not implemented")
+// ListIssues returns all issues (opened + closed) for the given project.
+func (p *GitLabProvider) ListIssues(ctx context.Context, namespace, repo string) ([]Issue, error) {
+	pid := gitlabPID(namespace, repo)
+	var issues []Issue
+
+	opts := &gitlab.ListProjectIssuesOptions{
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+	}
+	for {
+		page, resp, err := p.client.Issues.ListProjectIssues(pid, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list issues for %s: %w", pid, err)
+		}
+		for _, i := range page {
+			issues = append(issues, gitlabIssueToIssue(i))
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return issues, nil
+}
+
+// CreateIssue creates a new issue in the given project. If the issue's State
+// is "closed", UpdateIssue is called immediately after creation to close it.
+func (p *GitLabProvider) CreateIssue(ctx context.Context, namespace, repo string, issue Issue) (Issue, error) {
+	pid := gitlabPID(namespace, repo)
+
+	opts := &gitlab.CreateIssueOptions{
+		Title:       gitlab.Ptr(issue.Title),
+		Description: gitlab.Ptr(issue.Body),
+	}
+	if len(issue.Labels) > 0 {
+		labels := gitlab.LabelOptions(issue.Labels)
+		opts.Labels = &labels
+	}
+	if issue.MilestoneExternalID != nil {
+		opts.MilestoneID = issue.MilestoneExternalID
+	}
+
+	created, _, err := p.client.Issues.CreateIssue(pid, opts, gitlab.WithContext(ctx))
+	if err != nil {
+		return Issue{}, fmt.Errorf("create issue %q in %s: %w", issue.Title, pid, err)
+	}
+
+	if issue.State == "closed" {
+		updated, _, err := p.client.Issues.UpdateIssue(pid, created.IID, &gitlab.UpdateIssueOptions{
+			StateEvent: gitlab.Ptr("close"),
+		}, gitlab.WithContext(ctx))
+		if err != nil {
+			return Issue{}, fmt.Errorf("close issue %q in %s: %w", issue.Title, pid, err)
+		}
+		return gitlabIssueToIssue(updated), nil
+	}
+
+	return gitlabIssueToIssue(created), nil
 }
 
 // Compile-time check that GitLabProvider implements RepositoryProvider.
