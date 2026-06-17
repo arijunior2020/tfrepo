@@ -370,5 +370,21 @@ func (p *GitHubProvider) CreateRepository(ctx context.Context, namespace string,
 	return p.toRepositorySummary(data, namespace), nil
 }
 
+func (p *GitHubProvider) ListLabels(ctx context.Context, namespace, repo string) ([]Label, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (p *GitHubProvider) CreateLabel(ctx context.Context, namespace, repo string, label Label) (Label, error) {
+	return Label{}, fmt.Errorf("not implemented")
+}
+
+func (p *GitHubProvider) ListMilestones(ctx context.Context, namespace, repo string) ([]Milestone, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (p *GitHubProvider) CreateMilestone(ctx context.Context, namespace, repo string, m Milestone) (Milestone, error) {
+	return Milestone{}, fmt.Errorf("not implemented")
+}
+
 // Compile-time check that GitHubProvider implements RepositoryProvider.
 var _ RepositoryProvider = (*GitHubProvider)(nil)

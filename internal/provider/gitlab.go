@@ -427,5 +427,21 @@ func (p *GitLabProvider) CreateRepository(ctx context.Context, namespace string,
 	return toRepositorySummary(project), nil
 }
 
+func (p *GitLabProvider) ListLabels(ctx context.Context, namespace, repo string) ([]Label, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (p *GitLabProvider) CreateLabel(ctx context.Context, namespace, repo string, label Label) (Label, error) {
+	return Label{}, fmt.Errorf("not implemented")
+}
+
+func (p *GitLabProvider) ListMilestones(ctx context.Context, namespace, repo string) ([]Milestone, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (p *GitLabProvider) CreateMilestone(ctx context.Context, namespace, repo string, m Milestone) (Milestone, error) {
+	return Milestone{}, fmt.Errorf("not implemented")
+}
+
 // Compile-time check that GitLabProvider implements RepositoryProvider.
 var _ RepositoryProvider = (*GitLabProvider)(nil)

@@ -77,4 +77,10 @@ type RepositoryProvider interface {
 
 	// Validate
 	GetRepositoryState(ctx context.Context, namespace, repo string) (RepositoryState, error)
+
+	// Labels and milestones (tfrepo migrate-labels)
+	ListLabels(ctx context.Context, namespace, repo string) ([]Label, error)
+	CreateLabel(ctx context.Context, namespace, repo string, label Label) (Label, error)
+	ListMilestones(ctx context.Context, namespace, repo string) ([]Milestone, error)
+	CreateMilestone(ctx context.Context, namespace, repo string, m Milestone) (Milestone, error)
 }

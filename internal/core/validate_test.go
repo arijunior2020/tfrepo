@@ -47,6 +47,22 @@ func (f *fakeValidateProvider) GetRepositoryState(ctx context.Context, namespace
 	return f.state, f.stateErr
 }
 
+func (f *fakeValidateProvider) ListLabels(ctx context.Context, namespace, repo string) ([]provider.Label, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeValidateProvider) CreateLabel(ctx context.Context, namespace, repo string, label provider.Label) (provider.Label, error) {
+	return provider.Label{}, errors.New("not implemented")
+}
+
+func (f *fakeValidateProvider) ListMilestones(ctx context.Context, namespace, repo string) ([]provider.Milestone, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeValidateProvider) CreateMilestone(ctx context.Context, namespace, repo string, m provider.Milestone) (provider.Milestone, error) {
+	return provider.Milestone{}, errors.New("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeValidateProvider)(nil)
 
 func baseValidatePlan() MigrationPlan {

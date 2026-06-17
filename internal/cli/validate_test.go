@@ -39,6 +39,18 @@ func (f *fakeValidateCliProvider) GetAuthenticatedCloneURL(_, _ string) string {
 func (f *fakeValidateCliProvider) GetRepositoryState(_ context.Context, _, _ string) (provider.RepositoryState, error) {
 	return f.stateResult, f.stateErr
 }
+func (f *fakeValidateCliProvider) ListLabels(_ context.Context, _, _ string) ([]provider.Label, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeValidateCliProvider) CreateLabel(_ context.Context, _, _ string, _ provider.Label) (provider.Label, error) {
+	return provider.Label{}, errors.New("not implemented")
+}
+func (f *fakeValidateCliProvider) ListMilestones(_ context.Context, _, _ string) ([]provider.Milestone, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeValidateCliProvider) CreateMilestone(_ context.Context, _, _ string, _ provider.Milestone) (provider.Milestone, error) {
+	return provider.Milestone{}, errors.New("not implemented")
+}
 
 const baseValidateConfigYAML = `source:
   provider: github

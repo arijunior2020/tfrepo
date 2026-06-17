@@ -40,6 +40,18 @@ func (f *fakeMigrateCliProvider) GetAuthenticatedCloneURL(_, _ string) string { 
 func (f *fakeMigrateCliProvider) GetRepositoryState(_ context.Context, _, _ string) (provider.RepositoryState, error) {
 	return provider.RepositoryState{}, errors.New("not implemented")
 }
+func (f *fakeMigrateCliProvider) ListLabels(_ context.Context, _, _ string) ([]provider.Label, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeMigrateCliProvider) CreateLabel(_ context.Context, _, _ string, _ provider.Label) (provider.Label, error) {
+	return provider.Label{}, errors.New("not implemented")
+}
+func (f *fakeMigrateCliProvider) ListMilestones(_ context.Context, _, _ string) ([]provider.Milestone, error) {
+	return nil, errors.New("not implemented")
+}
+func (f *fakeMigrateCliProvider) CreateMilestone(_ context.Context, _, _ string, _ provider.Milestone) (provider.Milestone, error) {
+	return provider.Milestone{}, errors.New("not implemented")
+}
 
 const baseMigrateConfigYAML = `source:
   provider: github

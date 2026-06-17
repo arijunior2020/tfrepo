@@ -55,6 +55,22 @@ func (f *fakeScanProvider) GetRepositoryState(ctx context.Context, namespace, re
 	return provider.RepositoryState{}, errors.New("not implemented")
 }
 
+func (f *fakeScanProvider) ListLabels(ctx context.Context, namespace, repo string) ([]provider.Label, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeScanProvider) CreateLabel(ctx context.Context, namespace, repo string, label provider.Label) (provider.Label, error) {
+	return provider.Label{}, errors.New("not implemented")
+}
+
+func (f *fakeScanProvider) ListMilestones(ctx context.Context, namespace, repo string) ([]provider.Milestone, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeScanProvider) CreateMilestone(ctx context.Context, namespace, repo string, m provider.Milestone) (provider.Milestone, error) {
+	return provider.Milestone{}, errors.New("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeScanProvider)(nil)
 
 func TestScanAndWriteWritesInventoryAndPrintsSummary(t *testing.T) {
