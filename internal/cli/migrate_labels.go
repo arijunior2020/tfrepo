@@ -15,21 +15,20 @@ import (
 const labelsReportPath = "labels-report.json"
 
 func newMigrateLabelsCommand(exitCode *int) *cobra.Command {
-	var configPath string
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "migrate-labels",
 		Short: "Migra labels e milestones dos repositórios de origem para o destino",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			configPath, err := cmd.Flags().GetString(configFlagName)
+			if err != nil {
+				return err
+			}
 			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 			*exitCode = runMigrateLabels(ctx, configPath, cmd.OutOrStdout(), cmd.ErrOrStderr())
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVarP(&configPath, configFlagName, "c", defaultConfigPath, "arquivo de configuração")
-	return cmd
 }
 
 func runMigrateLabels(ctx context.Context, configPath string, stdout, stderr io.Writer) int {

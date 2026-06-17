@@ -11,8 +11,8 @@ var migrationArtifactPaths = []string{
 	inventoryPath,
 	migrationPlanPath,
 	migrationReportPath,
-	validationReportPath,
 	labelsReportPath,
+	validationReportPath,
 }
 
 func runDestroy(configPath string, includeConfig bool, stdout, stderr io.Writer) int {
