@@ -127,6 +127,18 @@ type LabelsReport struct {
 	Results     []LabelsMigrateResult `json:"results"`
 }
 
+type IssuesMigrateResult struct {
+	ID            string   `json:"id"`
+	Status        string   `json:"status"` // "success" | "failed"
+	IssuesCreated int      `json:"issuesCreated"`
+	Errors        []string `json:"errors,omitempty"`
+}
+
+type IssuesReport struct {
+	GeneratedAt time.Time             `json:"generatedAt"`
+	Results     []IssuesMigrateResult `json:"results"`
+}
+
 // WriteJSON marshals v as indented JSON and writes it to path, creating or
 // truncating the file with mode 0644.
 func WriteJSON(path string, v any) error {
