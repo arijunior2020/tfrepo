@@ -87,4 +87,8 @@ type RepositoryProvider interface {
 	// Issues (tfrepo migrate-issues)
 	ListIssues(ctx context.Context, namespace, repo string) ([]Issue, error)
 	CreateIssue(ctx context.Context, namespace, repo string, issue Issue) (Issue, error)
+
+	// Pull Requests (tfrepo migrate-prs)
+	ListPullRequests(ctx context.Context, namespace, repo string) ([]PullRequest, error)
+	CreatePullRequest(ctx context.Context, namespace, repo string, pr PullRequest) (PullRequest, error)
 }

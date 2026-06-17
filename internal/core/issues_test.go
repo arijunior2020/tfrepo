@@ -59,6 +59,14 @@ func (f *fakeIssuesProvider) CreateIssue(_ context.Context, _, _ string, issue p
 	return created, nil
 }
 
+func (f *fakeIssuesProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeIssuesProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeIssuesProvider)(nil)
 
 func makeIssuePlan(tasks ...MigrationTask) MigrationPlan {

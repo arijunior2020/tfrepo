@@ -79,6 +79,14 @@ func (f *fakeScanProvider) CreateIssue(_ context.Context, _, _ string, _ provide
 	return provider.Issue{}, errors.New("not implemented")
 }
 
+func (f *fakeScanProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeScanProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeScanProvider)(nil)
 
 func TestScanAndWriteWritesInventoryAndPrintsSummary(t *testing.T) {

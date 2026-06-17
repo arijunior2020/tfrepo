@@ -556,5 +556,17 @@ func (p *GitHubProvider) CreateIssue(ctx context.Context, namespace, repo string
 	return githubIssueToIssue(created), nil
 }
 
+// ListPullRequests returns open pull requests for the repository.
+// Not yet implemented — will be added in Plan 10 (migrate-prs).
+func (p *GitHubProvider) ListPullRequests(_ context.Context, _, _ string) ([]PullRequest, error) {
+	panic("not implemented")
+}
+
+// CreatePullRequest creates a pull request on the target repository.
+// Not yet implemented — will be added in Plan 10 (migrate-prs).
+func (p *GitHubProvider) CreatePullRequest(_ context.Context, _, _ string, _ PullRequest) (PullRequest, error) {
+	panic("not implemented")
+}
+
 // Compile-time check that GitHubProvider implements RepositoryProvider.
 var _ RepositoryProvider = (*GitHubProvider)(nil)

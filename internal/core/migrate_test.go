@@ -90,6 +90,14 @@ func (f *fakeMigrateProvider) CreateIssue(_ context.Context, _, _ string, _ prov
 	return provider.Issue{}, errors.New("not implemented")
 }
 
+func (f *fakeMigrateProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeMigrateProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeMigrateProvider)(nil)
 
 func baseMigratePlan() MigrationPlan {

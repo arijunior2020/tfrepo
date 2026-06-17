@@ -63,6 +63,14 @@ func (f *fakeMigrateIssuesProvider) CreateIssue(_ context.Context, _, _ string, 
 	return created, nil
 }
 
+func (f *fakeMigrateIssuesProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeMigrateIssuesProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeMigrateIssuesProvider)(nil)
 
 func TestRunMigrateIssuesWithProviders_WritesReport(t *testing.T) {

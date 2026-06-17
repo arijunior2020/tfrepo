@@ -651,5 +651,17 @@ func (p *GitLabProvider) CreateIssue(ctx context.Context, namespace, repo string
 	return gitlabIssueToIssue(created), nil
 }
 
+// ListPullRequests returns open merge requests for the repository.
+// Not yet implemented — will be added in Plan 10 (migrate-prs).
+func (p *GitLabProvider) ListPullRequests(_ context.Context, _, _ string) ([]PullRequest, error) {
+	panic("not implemented")
+}
+
+// CreatePullRequest creates a merge request on the target repository.
+// Not yet implemented — will be added in Plan 10 (migrate-prs).
+func (p *GitLabProvider) CreatePullRequest(_ context.Context, _, _ string, _ PullRequest) (PullRequest, error) {
+	panic("not implemented")
+}
+
 // Compile-time check that GitLabProvider implements RepositoryProvider.
 var _ RepositoryProvider = (*GitLabProvider)(nil)

@@ -60,6 +60,14 @@ func (f *fakeValidateCliProvider) CreateIssue(_ context.Context, _, _ string, _ 
 	return provider.Issue{}, errors.New("not implemented")
 }
 
+func (f *fakeValidateCliProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeValidateCliProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 const baseValidateConfigYAML = `source:
   provider: github
   namespace: my-org

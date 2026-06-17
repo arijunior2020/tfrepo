@@ -71,6 +71,14 @@ func (f *fakeValidateProvider) CreateIssue(_ context.Context, _, _ string, _ pro
 	return provider.Issue{}, errors.New("not implemented")
 }
 
+func (f *fakeValidateProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeValidateProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeValidateProvider)(nil)
 
 func baseValidatePlan() MigrationPlan {

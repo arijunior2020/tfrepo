@@ -72,6 +72,14 @@ func (f *fakeLabelsProvider) CreateIssue(_ context.Context, _, _ string, _ provi
 	return provider.Issue{}, errors.New("not implemented")
 }
 
+func (f *fakeLabelsProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeLabelsProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 var _ provider.RepositoryProvider = (*fakeLabelsProvider)(nil)
 
 func baseLabelsPlan() MigrationPlan {

@@ -61,6 +61,14 @@ func (f *fakeMigrateCliProvider) CreateIssue(_ context.Context, _, _ string, _ p
 	return provider.Issue{}, errors.New("not implemented")
 }
 
+func (f *fakeMigrateCliProvider) ListPullRequests(_ context.Context, _, _ string) ([]provider.PullRequest, error) {
+	panic("not implemented")
+}
+
+func (f *fakeMigrateCliProvider) CreatePullRequest(_ context.Context, _, _ string, _ provider.PullRequest) (provider.PullRequest, error) {
+	panic("not implemented")
+}
+
 const baseMigrateConfigYAML = `source:
   provider: github
   namespace: my-org
