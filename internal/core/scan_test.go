@@ -69,11 +69,11 @@ func (f *fakeScanProvider) CreateMilestone(ctx context.Context, namespace, repo 
 }
 
 func (f *fakeScanProvider) ListIssues(_ context.Context, _, _ string) ([]provider.Issue, error) {
-	panic("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (f *fakeScanProvider) CreateIssue(_ context.Context, _, _ string, _ provider.Issue) (provider.Issue, error) {
-	panic("not implemented")
+	return provider.Issue{}, errors.New("not implemented")
 }
 
 var _ provider.RepositoryProvider = (*fakeScanProvider)(nil)

@@ -65,11 +65,11 @@ func (f *fakeLabelsProvider) CreateMilestone(_ context.Context, _, _ string, m p
 }
 
 func (f *fakeLabelsProvider) ListIssues(_ context.Context, _, _ string) ([]provider.Issue, error) {
-	panic("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (f *fakeLabelsProvider) CreateIssue(_ context.Context, _, _ string, _ provider.Issue) (provider.Issue, error) {
-	panic("not implemented")
+	return provider.Issue{}, errors.New("not implemented")
 }
 
 var _ provider.RepositoryProvider = (*fakeLabelsProvider)(nil)

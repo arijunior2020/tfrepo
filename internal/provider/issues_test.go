@@ -35,7 +35,10 @@ func TestIssueJSONRoundTrip(t *testing.T) {
 	if got.State != orig.State {
 		t.Errorf("State = %q, want %q", got.State, orig.State)
 	}
-	if len(got.Labels) != 2 || got.Labels[0] != "bug" {
+	if got.Body != orig.Body {
+		t.Errorf("Body = %q, want %q", got.Body, orig.Body)
+	}
+	if len(got.Labels) != 2 || got.Labels[0] != "bug" || got.Labels[1] != "priority" {
 		t.Errorf("Labels = %v, want [bug priority]", got.Labels)
 	}
 	if got.MilestoneExternalID == nil || *got.MilestoneExternalID != 42 {
