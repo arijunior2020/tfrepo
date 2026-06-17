@@ -459,7 +459,11 @@ Os campos `assignee` também não são migrados, pois dependem de o usuário exi
 
 **Recomendação prática**
 
-Antes de rodar a migração, oriente os membros do time a se cadastrarem no destino usando o **mesmo email** que usam nos commits — isso garante que o histórico git fique corretamente associado aos perfis sem nenhuma intervenção adicional.
+Antes de rodar a migração, cada membro do time deve criar sua conta na plataforma de destino usando exatamente o **mesmo nome e email** que utiliza nos commits. Essa é a única forma de o destino associar automaticamente o histórico git ao perfil correto — a correspondência é feita exclusivamente pelo email do commit.
+
+Ordem recomendada:
+1. Todos os membros criam suas contas no destino com nome e email idênticos aos dos commits
+2. Somente então execute o pipeline de migração (`scan` → `plan` → `migrate` → ...)
 
 A migração de membros (convite, mapeamento de usuários e reassign de issues/PRs) está planejada para uma versão futura.
 
