@@ -244,6 +244,11 @@ PRs já existentes no destino (por título) são ignorados — a operação é i
 tfrepo migrate-prs
 ```
 
+```
+Flags:
+  -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
+```
+
 ### `tfrepo validate`
 
 Compara branches e tags entre origem e destino usando `migration-plan.json`
