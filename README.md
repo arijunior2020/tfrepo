@@ -156,6 +156,8 @@ Todos os comandos seguintes leem este arquivo como referência central.
 Clona cada repositório da origem via `git clone --mirror` e empurra para o destino com `git push --mirror`, preservando branches, tags e histórico completo.
 Falhas por repositório são registradas sem interromper os demais.
 
+> **Atenção:** `migrate` copia **apenas o conteúdo git** (branches, tags, histórico). Labels, milestones, issues e pull requests são dados da plataforma e precisam ser migrados separadamente pelos comandos `migrate-labels`, `migrate-issues` e `migrate-prs`.
+
 **6. `tfrepo migrate-labels` → `labels-report.json`**
 
 Migra labels e milestones de cada repositório.
