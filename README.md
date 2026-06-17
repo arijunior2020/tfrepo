@@ -97,6 +97,7 @@ tfrepo plan              # gera plano de migração → migration-plan.json
 tfrepo migrate           # executa migração → migration-report.json
 tfrepo migrate-labels    # migra labels e milestones → labels-report.json
 tfrepo migrate-issues    # migra issues → issues-report.json
+tfrepo migrate-prs       # migra PRs abertos → prs-report.json
 tfrepo validate          # verifica integridade → validation-report.json
 ```
 
@@ -233,6 +234,16 @@ Flags:
   -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
+### `tfrepo migrate-prs`
+
+Migra pull requests abertos dos repositórios de origem para o destino.
+Apenas PRs abertos são migrados — PRs fechados e mesclados são artefatos históricos preservados no histórico git.
+PRs já existentes no destino (por título) são ignorados — a operação é idempotente.
+
+```bash
+tfrepo migrate-prs
+```
+
 ### `tfrepo validate`
 
 Compara branches e tags entre origem e destino usando `migration-plan.json`
@@ -256,6 +267,7 @@ migração no mesmo diretório:
 - `migration-report.json`
 - `labels-report.json`
 - `issues-report.json`
+- `prs-report.json`
 - `validation-report.json`
 
 Por padrão, preserva o arquivo de configuração. Use `--include-config` para
@@ -300,6 +312,7 @@ Todos os artefatos são JSON e ficam no diretório de trabalho atual:
 | `migration-report.json`  | `migrate`         | `validate` (opcional — pula falhas)   |
 | `labels-report.json`     | `migrate-labels`  | `migrate-issues` (milestone mapping)  |
 | `issues-report.json`     | `migrate-issues`  | —                                     |
+| `prs-report.json`        | `migrate-prs`     | —                                     |
 | `validation-report.json` | `validate`        | —                                     |
 
 ## Segurança
