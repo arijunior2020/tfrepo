@@ -108,25 +108,38 @@ O pipeline do tfrepo é **linear e incremental**: cada etapa produz um artefato 
 ### Diagrama do pipeline
 
 ```
-  configure / init          ← setup único por máquina / projeto
-        │
-        ▼
-      scan         →  inventory.json
-        │
-        ▼
-      plan         →  migration-plan.json
-        │
-        ▼
-    migrate        →  migration-report.json
-        │
-        ├──▶  migrate-labels  →  labels-report.json ─┐
-        │                                             │ (mapeamento de milestones)
-        ├──▶  migrate-issues  →  issues-report.json ◀┘
-        │
-        ├──▶  migrate-prs     →  prs-report.json
-        │
-        ▼
-     validate      →  validation-report.json
+  ┌─────────────────────────────────────────────────────┐
+  │                  SETUP (uma vez)                    │
+  │                                                     │
+  │  configure  →  ~/.tfrepo/credentials  (tokens)      │
+  │                                                     │
+  │  init       →  transferepo.config.yaml  (manual)    │
+  │    ou                                               │
+  │  setup      →  transferepo.config.yaml  (wizard)    │
+  └─────────────────────────────────────────────────────┘
+                          │
+                          ▼
+                        scan        →  inventory.json
+                          │
+                          ▼
+                        plan        →  migration-plan.json
+                          │
+                          ▼
+                       migrate      →  migration-report.json
+                       (git only: branches, tags, histórico)
+                          │
+            ┌─────────────┼──────────────┐
+            ▼             ▼              ▼
+     migrate-labels  migrate-issues  migrate-prs
+           │               │              │
+           ▼               ▼              ▼
+    labels-report   issues-report    prs-report
+       .json    ──▶    .json           .json
+   (milestones)   (usa milestone
+                    mapping)
+                          │
+                          ▼
+                       validate     →  validation-report.json
 ```
 
 ### Etapas explicadas
@@ -136,9 +149,11 @@ O pipeline do tfrepo é **linear e incremental**: cada etapa produz um artefato 
 `tfrepo configure` salva tokens em `~/.tfrepo/credentials` (permissão `0600`).
 Alternativa: exporte `GITHUB_TOKEN` e/ou `GITLAB_TOKEN` como variáveis de ambiente — elas sempre têm prioridade.
 
-**2. `tfrepo init` → `transferepo.config.yaml`**
+**2. `tfrepo init` ou `tfrepo setup` → `transferepo.config.yaml`**
 
-Gera o arquivo de configuração com origem, destino, filtros e mapeamentos de nome.
+- `init` gera um arquivo de configuração de exemplo para edição manual.
+- `setup` é o wizard interativo recomendado: conecta na API da origem, lista os repositórios disponíveis e gera o config já preenchido com origem, destino e seleção de repositórios.
+
 Execute uma vez por projeto de migração.
 
 **3. `tfrepo scan` → `inventory.json`**
