@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"strings"
+	"time"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -427,20 +429,131 @@ func (p *GitLabProvider) CreateRepository(ctx context.Context, namespace string,
 	return toRepositorySummary(project), nil
 }
 
+func gitlabPID(namespace, repo string) string {
+	return namespace + "/" + repo
+}
+
 func (p *GitLabProvider) ListLabels(ctx context.Context, namespace, repo string) ([]Label, error) {
-	return nil, fmt.Errorf("not implemented")
+	pid := gitlabPID(namespace, repo)
+	var result []Label
+
+	opts := &gitlab.ListLabelsOptions{ListOptions: gitlab.ListOptions{PerPage: listPerPage}}
+	for {
+		labels, resp, err := p.client.Labels.ListLabels(pid, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("listar labels de %q: %w", pid, err)
+		}
+		for _, l := range labels {
+			result = append(result, Label{
+				Name:        l.Name,
+				Color:       strings.TrimPrefix(l.Color, "#"),
+				Description: l.Description,
+			})
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
 }
 
 func (p *GitLabProvider) CreateLabel(ctx context.Context, namespace, repo string, label Label) (Label, error) {
-	return Label{}, fmt.Errorf("not implemented")
+	pid := gitlabPID(namespace, repo)
+
+	created, _, err := p.client.Labels.CreateLabel(pid, &gitlab.CreateLabelOptions{
+		Name:        gitlab.Ptr(label.Name),
+		Color:       gitlab.Ptr("#" + label.Color),
+		Description: gitlab.Ptr(label.Description),
+	}, gitlab.WithContext(ctx))
+	if err != nil {
+		return Label{}, fmt.Errorf("criar label %q em %q: %w", label.Name, pid, err)
+	}
+
+	return Label{
+		Name:        created.Name,
+		Color:       strings.TrimPrefix(created.Color, "#"),
+		Description: created.Description,
+	}, nil
 }
 
 func (p *GitLabProvider) ListMilestones(ctx context.Context, namespace, repo string) ([]Milestone, error) {
-	return nil, fmt.Errorf("not implemented")
+	pid := gitlabPID(namespace, repo)
+	var result []Milestone
+
+	opts := &gitlab.ListMilestonesOptions{ListOptions: gitlab.ListOptions{PerPage: listPerPage}}
+	for {
+		milestones, resp, err := p.client.Milestones.ListMilestones(pid, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("listar milestones de %q: %w", pid, err)
+		}
+		for _, m := range milestones {
+			ms := Milestone{
+				ExternalID:  int64(m.ID),
+				Title:       m.Title,
+				Description: m.Description,
+				State:       MilestoneStateOpen,
+			}
+			if m.State == "closed" {
+				ms.State = MilestoneStateClosed
+			}
+			if m.DueDate != nil {
+				t := time.Time(*m.DueDate)
+				ms.DueDate = &t
+			}
+			result = append(result, ms)
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return result, nil
 }
 
 func (p *GitLabProvider) CreateMilestone(ctx context.Context, namespace, repo string, m Milestone) (Milestone, error) {
-	return Milestone{}, fmt.Errorf("not implemented")
+	pid := gitlabPID(namespace, repo)
+
+	opts := &gitlab.CreateMilestoneOptions{
+		Title:       gitlab.Ptr(m.Title),
+		Description: gitlab.Ptr(m.Description),
+	}
+	if m.DueDate != nil {
+		d := gitlab.ISOTime(*m.DueDate)
+		opts.DueDate = &d
+	}
+
+	created, _, err := p.client.Milestones.CreateMilestone(pid, opts, gitlab.WithContext(ctx))
+	if err != nil {
+		return Milestone{}, fmt.Errorf("criar milestone %q em %q: %w", m.Title, pid, err)
+	}
+
+	if m.State == MilestoneStateClosed {
+		_, _, err = p.client.Milestones.UpdateMilestone(pid, int64(created.ID), &gitlab.UpdateMilestoneOptions{
+			StateEvent: gitlab.Ptr("close"),
+		}, gitlab.WithContext(ctx))
+		if err != nil {
+			return Milestone{}, fmt.Errorf("fechar milestone %q em %q: %w", m.Title, pid, err)
+		}
+	}
+
+	result := Milestone{
+		ExternalID:  int64(created.ID),
+		Title:       created.Title,
+		Description: created.Description,
+		State:       MilestoneStateOpen,
+	}
+	if m.State == MilestoneStateClosed {
+		result.State = MilestoneStateClosed
+	}
+	if created.DueDate != nil {
+		t := time.Time(*created.DueDate)
+		result.DueDate = &t
+	}
+
+	return result, nil
 }
 
 // Compile-time check that GitLabProvider implements RepositoryProvider.

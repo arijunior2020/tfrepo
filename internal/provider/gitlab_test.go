@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -518,6 +520,15 @@ func TestGitLabGetRepositoryState(t *testing.T) {
 	}
 }
 
+func newGitLabTestProvider(t *testing.T, serverURL string) *GitLabProvider {
+	t.Helper()
+	p, err := NewGitLabProvider("test-token", serverURL)
+	if err != nil {
+		t.Fatalf("NewGitLabProvider: %v", err)
+	}
+	return p
+}
+
 func decodeJSONBody(t *testing.T, r *http.Request) map[string]any {
 	t.Helper()
 
@@ -601,5 +612,122 @@ func TestGitLabCreateRepository(t *testing.T) {
 	}
 	if got.SizeKB != 0 {
 		t.Errorf("SizeKB = %d, want 0", got.SizeKB)
+	}
+}
+
+func TestGitLabProviderListLabels(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/my-group%2Frepo-a/labels", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"id":1,"name":"bug","color":"#d73a4a","description":"Something is wrong"},{"id":2,"name":"enhancement","color":"#a2eeef","description":""}]`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	labels, err := p.ListLabels(context.Background(), "my-group", "repo-a")
+	if err != nil {
+		t.Fatalf("ListLabels: %v", err)
+	}
+	if len(labels) != 2 {
+		t.Fatalf("len = %d, want 2", len(labels))
+	}
+	if labels[0].Name != "bug" || labels[0].Color != "d73a4a" {
+		t.Errorf("labels[0] = %+v, want Color without #", labels[0])
+	}
+	if labels[1].Name != "enhancement" || labels[1].Color != "a2eeef" {
+		t.Errorf("labels[1] = %+v", labels[1])
+	}
+}
+
+func TestGitLabProviderCreateLabel(t *testing.T) {
+	var receivedBody []byte
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/my-group%2Frepo-a/labels", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var err error
+		receivedBody, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "read body: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"id":1,"name":"bug","color":"#d73a4a","description":"Something is wrong"}`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	got, err := p.CreateLabel(context.Background(), "my-group", "repo-a", Label{Name: "bug", Color: "d73a4a", Description: "Something is wrong"})
+	if err != nil {
+		t.Fatalf("CreateLabel: %v", err)
+	}
+	if got.Name != "bug" || got.Color != "d73a4a" {
+		t.Errorf("got %+v", got)
+	}
+	if !strings.Contains(string(receivedBody), "#d73a4a") {
+		t.Errorf("request body %q should contain #d73a4a", receivedBody)
+	}
+}
+
+func TestGitLabProviderListMilestones(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/my-group%2Frepo-a/milestones", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"id":10,"title":"v1.0","description":"First stable release","state":"active","due_date":null}]`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	milestones, err := p.ListMilestones(context.Background(), "my-group", "repo-a")
+	if err != nil {
+		t.Fatalf("ListMilestones: %v", err)
+	}
+	if len(milestones) != 1 {
+		t.Fatalf("len = %d, want 1", len(milestones))
+	}
+	ms := milestones[0]
+	if ms.ExternalID != 10 || ms.Title != "v1.0" || ms.State != MilestoneStateOpen {
+		t.Errorf("milestones[0] = %+v", ms)
+	}
+	if ms.DueDate != nil {
+		t.Errorf("DueDate should be nil, got %v", ms.DueDate)
+	}
+}
+
+func TestGitLabProviderCreateMilestone(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/my-group%2Frepo-a/milestones", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"id":10,"title":"v1.0","description":"First stable release","state":"active","due_date":null}`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	got, err := p.CreateMilestone(context.Background(), "my-group", "repo-a", Milestone{
+		Title:       "v1.0",
+		Description: "First stable release",
+		State:       MilestoneStateOpen,
+	})
+	if err != nil {
+		t.Fatalf("CreateMilestone: %v", err)
+	}
+	if got.ExternalID != 10 || got.Title != "v1.0" {
+		t.Errorf("got %+v", got)
 	}
 }
