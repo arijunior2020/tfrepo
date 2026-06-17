@@ -703,3 +703,105 @@ func TestGitHubProviderCreateMilestone(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 }
+
+func TestGitHubProviderListIssues(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/myorg/myrepo/issues", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("state") != "all" {
+			http.Error(w, "expected ?state=all", http.StatusBadRequest)
+			return
+		}
+		writeJSON(t, w, []*github.Issue{
+			{
+				Number: github.Ptr(1),
+				Title:  github.Ptr("Real issue"),
+				Body:   github.Ptr("body text"),
+				State:  github.Ptr("open"),
+				Labels: []*github.Label{
+					{Name: github.Ptr("bug")},
+				},
+			},
+			{
+				Number: github.Ptr(2),
+				Title:  github.Ptr("A pull request"),
+				Body:   github.Ptr("pr body"),
+				State:  github.Ptr("open"),
+				PullRequestLinks: &github.PullRequestLinks{
+					URL: github.Ptr("https://api.github.com/repos/myorg/myrepo/pulls/2"),
+				},
+			},
+		})
+	})
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+
+	issues, err := p.ListIssues(context.Background(), "myorg", "myrepo")
+	if err != nil {
+		t.Fatalf("ListIssues: %v", err)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("got %d issues, want 1 (PR should be filtered)", len(issues))
+	}
+	got := issues[0]
+	if got.ExternalID != 1 {
+		t.Errorf("ExternalID = %d, want 1", got.ExternalID)
+	}
+	if got.State != "open" {
+		t.Errorf("State = %q, want %q", got.State, "open")
+	}
+	if len(got.Labels) != 1 || got.Labels[0] != "bug" {
+		t.Errorf("Labels = %v, want [bug]", got.Labels)
+	}
+}
+
+func TestGitHubProviderCreateIssue(t *testing.T) {
+	editCalled := false
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/myorg/myrepo/issues", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, &github.Issue{
+			Number: github.Ptr(10),
+			Title:  github.Ptr("My issue"),
+			Body:   github.Ptr(""),
+			State:  github.Ptr("open"),
+		})
+	})
+	mux.HandleFunc("/repos/myorg/myrepo/issues/10", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		editCalled = true
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(t, w, &github.Issue{
+			Number: github.Ptr(10),
+			Title:  github.Ptr("My issue"),
+			Body:   github.Ptr(""),
+			State:  github.Ptr("closed"),
+		})
+	})
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+
+	got, err := p.CreateIssue(context.Background(), "myorg", "myrepo", Issue{
+		Title: "My issue",
+		Body:  "",
+		State: "closed",
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if !editCalled {
+		t.Error("expected Edit to be called to close the issue, but it was not")
+	}
+	if got.State != "closed" {
+		t.Errorf("State = %q, want %q", got.State, "closed")
+	}
+	if got.ExternalID != 10 {
+		t.Errorf("ExternalID = %d, want 10", got.ExternalID)
+	}
+}

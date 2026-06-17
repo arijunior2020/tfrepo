@@ -480,14 +480,80 @@ func (p *GitHubProvider) CreateMilestone(ctx context.Context, namespace, repo st
 	return result, nil
 }
 
-// ListIssues is not yet implemented for GitHubProvider.
-func (p *GitHubProvider) ListIssues(_ context.Context, _, _ string) ([]Issue, error) {
-	panic("not implemented")
+// githubIssueToIssue maps a go-github Issue onto the provider-neutral Issue.
+func githubIssueToIssue(i *github.Issue) Issue {
+	iss := Issue{
+		ExternalID: int64(i.GetNumber()),
+		Title:      i.GetTitle(),
+		Body:       i.GetBody(),
+		State:      i.GetState(),
+	}
+	for _, l := range i.Labels {
+		iss.Labels = append(iss.Labels, l.GetName())
+	}
+	if m := i.GetMilestone(); m != nil {
+		id := int64(m.GetNumber())
+		iss.MilestoneExternalID = &id
+	}
+	return iss
 }
 
-// CreateIssue is not yet implemented for GitHubProvider.
-func (p *GitHubProvider) CreateIssue(_ context.Context, _, _ string, _ Issue) (Issue, error) {
-	panic("not implemented")
+// ListIssues returns all issues (open and closed) for the repository,
+// excluding pull requests.
+func (p *GitHubProvider) ListIssues(ctx context.Context, namespace, repo string) ([]Issue, error) {
+	var issues []Issue
+	opts := &github.IssueListByRepoOptions{
+		State:       "all",
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+	for {
+		page, resp, err := p.client.Issues.ListByRepo(ctx, namespace, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("list issues for %s/%s: %w", namespace, repo, err)
+		}
+		for _, i := range page {
+			if i.IsPullRequest() {
+				continue
+			}
+			issues = append(issues, githubIssueToIssue(i))
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.ListOptions.Page = resp.NextPage
+	}
+	return issues, nil
+}
+
+// CreateIssue creates a new issue on the repository. If the issue State is
+// "closed", an additional Edit call is made to close the issue after creation.
+func (p *GitHubProvider) CreateIssue(ctx context.Context, namespace, repo string, issue Issue) (Issue, error) {
+	req := &github.IssueRequest{
+		Title: github.Ptr(issue.Title),
+		Body:  github.Ptr(issue.Body),
+	}
+	if len(issue.Labels) > 0 {
+		l := issue.Labels
+		req.Labels = &l
+	}
+	if issue.MilestoneExternalID != nil {
+		m := int(*issue.MilestoneExternalID)
+		req.Milestone = &m
+	}
+	created, _, err := p.client.Issues.Create(ctx, namespace, repo, req)
+	if err != nil {
+		return Issue{}, fmt.Errorf("create issue %q in %s/%s: %w", issue.Title, namespace, repo, err)
+	}
+	if issue.State == "closed" {
+		edited, _, err := p.client.Issues.Edit(ctx, namespace, repo, created.GetNumber(), &github.IssueRequest{
+			State: github.Ptr("closed"),
+		})
+		if err != nil {
+			return Issue{}, fmt.Errorf("close issue %q in %s/%s: %w", issue.Title, namespace, repo, err)
+		}
+		return githubIssueToIssue(edited), nil
+	}
+	return githubIssueToIssue(created), nil
 }
 
 // Compile-time check that GitHubProvider implements RepositoryProvider.
