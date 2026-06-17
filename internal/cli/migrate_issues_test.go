@@ -72,7 +72,11 @@ func TestRunMigrateIssuesWithProviders_WritesReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(origDir) })
+	t.Cleanup(func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Logf("cleanup: failed to restore directory: %v", err)
+		}
+	})
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
