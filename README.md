@@ -101,6 +101,93 @@ tfrepo migrate-prs       # migra PRs abertos → prs-report.json
 tfrepo validate          # verifica integridade → validation-report.json
 ```
 
+## Fluxo de migração
+
+O pipeline do tfrepo é **linear e incremental**: cada etapa produz um artefato JSON que a próxima consome. Você pode executar etapas individualmente — útil para depuração, retentativas parciais ou migrações em fases.
+
+### Diagrama do pipeline
+
+```
+  configure / init          ← setup único por máquina / projeto
+        │
+        ▼
+      scan         →  inventory.json
+        │
+        ▼
+      plan         →  migration-plan.json
+        │
+        ▼
+    migrate        →  migration-report.json
+        │
+        ├──▶  migrate-labels  →  labels-report.json ─┐
+        │                                             │ (mapeamento de milestones)
+        ├──▶  migrate-issues  →  issues-report.json ◀┘
+        │
+        ├──▶  migrate-prs     →  prs-report.json
+        │
+        ▼
+     validate      →  validation-report.json
+```
+
+### Etapas explicadas
+
+**1. Configuração — uma vez por máquina**
+
+`tfrepo configure` salva tokens em `~/.tfrepo/credentials` (permissão `0600`).
+Alternativa: exporte `GITHUB_TOKEN` e/ou `GITLAB_TOKEN` como variáveis de ambiente — elas sempre têm prioridade.
+
+**2. `tfrepo init` → `transferepo.config.yaml`**
+
+Gera o arquivo de configuração com origem, destino, filtros e mapeamentos de nome.
+Execute uma vez por projeto de migração.
+
+**3. `tfrepo scan` → `inventory.json`**
+
+Conecta na API da origem e lista todos os repositórios do namespace com seus metadados (branches, tags, visibilidade, tamanho).
+Este snapshot é a entrada do planejamento.
+
+**4. `tfrepo plan` → `migration-plan.json`**
+
+Aplica filtros e mapeamentos do config sobre o inventário e gera uma *tarefa* de migração por repositório.
+Todos os comandos seguintes leem este arquivo como referência central.
+
+**5. `tfrepo migrate` → `migration-report.json`**
+
+Clona cada repositório da origem via `git clone --mirror` e empurra para o destino com `git push --mirror`, preservando branches, tags e histórico completo.
+Falhas por repositório são registradas sem interromper os demais.
+
+**6. `tfrepo migrate-labels` → `labels-report.json`**
+
+Migra labels e milestones de cada repositório.
+O relatório inclui o mapeamento de IDs de milestone (origem → destino) consumido pela etapa seguinte para vincular issues às milestones corretas.
+
+**7. `tfrepo migrate-issues` → `issues-report.json`**
+
+Migra issues abertas e fechadas.
+Lê `labels-report.json` (se existir) para traduzir IDs de milestone.
+Issues com título já existente no destino são ignoradas — **operação idempotente**.
+
+**8. `tfrepo migrate-prs` → `prs-report.json`**
+
+Migra pull requests abertos.
+PRs mesclados e fechados não são migrados — o histórico de código já está preservado pelo `migrate`.
+PRs com título já existente no destino são ignorados — **operação idempotente**.
+
+**9. `tfrepo validate` → `validation-report.json`**
+
+Compara branches e tags entre origem e destino para verificar a integridade do mirror.
+Retorna exit code `1` se houver divergências — adequado para gates de CI/CD pós-migração.
+
+### Execução parcial e idempotência
+
+As etapas `migrate-labels`, `migrate-issues` e `migrate-prs` são **idempotentes**: re-executá-las não duplica dados já existentes no destino. Isso permite:
+
+- **Retentativa seletiva** — refazer só a etapa que falhou por erro de rede, sem re-executar o mirror completo.
+- **Migração incremental** — rodar `migrate-prs` dias depois do `migrate` original para capturar novos PRs.
+- **Validação contínua** — repetir `validate` após qualquer push para confirmar que a sincronia está íntegra.
+
+Para recomeçar do zero no mesmo diretório: `tfrepo destroy` remove todos os artefatos gerados (preservando o config por padrão).
+
 ## Configuração
 
 O arquivo `transferepo.config.yaml` (gerado por `tfrepo init`) segue o mesmo
