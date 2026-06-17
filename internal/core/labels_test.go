@@ -209,3 +209,29 @@ func TestMigrateLabelsAndMilestones_CreateLabelErrors(t *testing.T) {
 		t.Errorf("len(errors) = %d, want 2", len(r.Errors))
 	}
 }
+
+func TestMigrateLabelsAndMilestones_CreateMilestoneErrors(t *testing.T) {
+	source := &fakeLabelsProvider{
+		name: "github",
+		listMilestones: []provider.Milestone{
+			{ExternalID: 1, Title: "v1.0", State: provider.MilestoneStateOpen},
+			{ExternalID: 2, Title: "v2.0", State: provider.MilestoneStateOpen},
+		},
+	}
+	target := &fakeLabelsProvider{
+		name:               "gitlab",
+		createMilestoneErr: errors.New("quota exceeded"),
+	}
+
+	report, err := MigrateLabelsAndMilestones(context.Background(), baseLabelsPlan(), LabelsMigrateProviders{Source: source, Target: target})
+	if err != nil {
+		t.Fatalf("unexpected top-level error: %v", err)
+	}
+	r := report.Results[0]
+	if r.Status != "failed" {
+		t.Errorf("status = %q, want failed", r.Status)
+	}
+	if len(r.Errors) != 2 {
+		t.Errorf("len(errors) = %d, want 2", len(r.Errors))
+	}
+}

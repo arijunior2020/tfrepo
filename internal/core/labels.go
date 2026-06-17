@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/arijunior2020/tfrepo/internal/provider"
+	"github.com/arijunior2020/tfrepo/internal/security"
 )
 
 type LabelsMigrateProviders struct {
@@ -53,11 +54,11 @@ func migrateRepoLabelsAndMilestones(ctx context.Context, task MigrationTask, pro
 func migrateLabels(ctx context.Context, task MigrationTask, providers LabelsMigrateProviders) (created int, errs []string) {
 	sourceLabels, err := providers.Source.ListLabels(ctx, task.Source.Namespace, task.Source.Repo)
 	if err != nil {
-		return 0, []string{fmt.Sprintf("listar labels de origem %s: %v", task.ID, err)}
+		return 0, []string{fmt.Sprintf("listar labels de origem %s: %s", task.ID, security.Redact(err.Error()))}
 	}
 	targetLabels, err := providers.Target.ListLabels(ctx, task.Target.Namespace, task.Target.Repo)
 	if err != nil {
-		return 0, []string{fmt.Sprintf("listar labels de destino %s: %v", task.ID, err)}
+		return 0, []string{fmt.Sprintf("listar labels de destino %s: %s", task.ID, security.Redact(err.Error()))}
 	}
 
 	existing := make(map[string]bool, len(targetLabels))
@@ -70,7 +71,7 @@ func migrateLabels(ctx context.Context, task MigrationTask, providers LabelsMigr
 			continue
 		}
 		if _, err := providers.Target.CreateLabel(ctx, task.Target.Namespace, task.Target.Repo, label); err != nil {
-			errs = append(errs, fmt.Sprintf("criar label %q em %s: %v", label.Name, task.ID, err))
+			errs = append(errs, fmt.Sprintf("criar label %q em %s: %s", label.Name, task.ID, security.Redact(err.Error())))
 			continue
 		}
 		created++
@@ -83,12 +84,12 @@ func migrateMilestones(ctx context.Context, task MigrationTask, providers Labels
 
 	sourceMilestones, err := providers.Source.ListMilestones(ctx, task.Source.Namespace, task.Source.Repo)
 	if err != nil {
-		errs = []string{fmt.Sprintf("listar milestones de origem %s: %v", task.ID, err)}
+		errs = []string{fmt.Sprintf("listar milestones de origem %s: %s", task.ID, security.Redact(err.Error()))}
 		return
 	}
 	targetMilestones, err := providers.Target.ListMilestones(ctx, task.Target.Namespace, task.Target.Repo)
 	if err != nil {
-		errs = []string{fmt.Sprintf("listar milestones de destino %s: %v", task.ID, err)}
+		errs = []string{fmt.Sprintf("listar milestones de destino %s: %s", task.ID, security.Redact(err.Error()))}
 		return
 	}
 
@@ -105,7 +106,7 @@ func migrateMilestones(ctx context.Context, task MigrationTask, providers Labels
 		}
 		created, err := providers.Target.CreateMilestone(ctx, task.Target.Namespace, task.Target.Repo, ms)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("criar milestone %q em %s: %v", ms.Title, task.ID, err))
+			errs = append(errs, fmt.Sprintf("criar milestone %q em %s: %s", ms.Title, task.ID, security.Redact(err.Error())))
 			continue
 		}
 		idMap[sourceKey] = created.ExternalID
