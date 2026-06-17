@@ -441,7 +441,7 @@ func (p *GitLabProvider) ListLabels(ctx context.Context, namespace, repo string)
 	for {
 		labels, resp, err := p.client.Labels.ListLabels(pid, opts, gitlab.WithContext(ctx))
 		if err != nil {
-			return nil, fmt.Errorf("listar labels de %q: %w", pid, err)
+			return nil, fmt.Errorf("list labels for %s: %w", pid, err)
 		}
 		for _, l := range labels {
 			result = append(result, Label{
@@ -468,7 +468,7 @@ func (p *GitLabProvider) CreateLabel(ctx context.Context, namespace, repo string
 		Description: gitlab.Ptr(label.Description),
 	}, gitlab.WithContext(ctx))
 	if err != nil {
-		return Label{}, fmt.Errorf("criar label %q em %q: %w", label.Name, pid, err)
+		return Label{}, fmt.Errorf("create label %q in %s: %w", label.Name, pid, err)
 	}
 
 	return Label{
@@ -480,37 +480,42 @@ func (p *GitLabProvider) CreateLabel(ctx context.Context, namespace, repo string
 
 func (p *GitLabProvider) ListMilestones(ctx context.Context, namespace, repo string) ([]Milestone, error) {
 	pid := gitlabPID(namespace, repo)
-	var result []Milestone
+	var milestones []Milestone
 
-	opts := &gitlab.ListMilestonesOptions{ListOptions: gitlab.ListOptions{PerPage: listPerPage}}
-	for {
-		milestones, resp, err := p.client.Milestones.ListMilestones(pid, opts, gitlab.WithContext(ctx))
-		if err != nil {
-			return nil, fmt.Errorf("listar milestones de %q: %w", pid, err)
+	for _, state := range []string{"active", "closed"} {
+		opts := &gitlab.ListMilestonesOptions{
+			State:       gitlab.Ptr(state),
+			ListOptions: gitlab.ListOptions{PerPage: listPerPage},
 		}
-		for _, m := range milestones {
-			ms := Milestone{
-				ExternalID:  int64(m.ID),
-				Title:       m.Title,
-				Description: m.Description,
-				State:       MilestoneStateOpen,
+		for {
+			page, resp, err := p.client.Milestones.ListMilestones(pid, opts, gitlab.WithContext(ctx))
+			if err != nil {
+				return nil, fmt.Errorf("list milestones for %s: %w", pid, err)
 			}
-			if m.State == "closed" {
-				ms.State = MilestoneStateClosed
+			for _, m := range page {
+				ms := Milestone{
+					ExternalID:  m.ID,
+					Title:       m.Title,
+					Description: m.Description,
+					State:       MilestoneStateOpen,
+				}
+				if m.State == "closed" {
+					ms.State = MilestoneStateClosed
+				}
+				if m.DueDate != nil {
+					t := time.Time(*m.DueDate)
+					ms.DueDate = &t
+				}
+				milestones = append(milestones, ms)
 			}
-			if m.DueDate != nil {
-				t := time.Time(*m.DueDate)
-				ms.DueDate = &t
+			if resp.NextPage == 0 {
+				break
 			}
-			result = append(result, ms)
+			opts.Page = resp.NextPage
 		}
-		if resp.NextPage == 0 {
-			break
-		}
-		opts.Page = resp.NextPage
 	}
 
-	return result, nil
+	return milestones, nil
 }
 
 func (p *GitLabProvider) CreateMilestone(ctx context.Context, namespace, repo string, m Milestone) (Milestone, error) {
@@ -527,26 +532,34 @@ func (p *GitLabProvider) CreateMilestone(ctx context.Context, namespace, repo st
 
 	created, _, err := p.client.Milestones.CreateMilestone(pid, opts, gitlab.WithContext(ctx))
 	if err != nil {
-		return Milestone{}, fmt.Errorf("criar milestone %q em %q: %w", m.Title, pid, err)
+		return Milestone{}, fmt.Errorf("create milestone %q in %s: %w", m.Title, pid, err)
 	}
 
 	if m.State == MilestoneStateClosed {
-		_, _, err = p.client.Milestones.UpdateMilestone(pid, int64(created.ID), &gitlab.UpdateMilestoneOptions{
+		updated, _, err := p.client.Milestones.UpdateMilestone(pid, created.ID, &gitlab.UpdateMilestoneOptions{
 			StateEvent: gitlab.Ptr("close"),
 		}, gitlab.WithContext(ctx))
 		if err != nil {
-			return Milestone{}, fmt.Errorf("fechar milestone %q em %q: %w", m.Title, pid, err)
+			return Milestone{}, fmt.Errorf("close milestone %q in %s: %w", m.Title, pid, err)
 		}
+		result := Milestone{
+			ExternalID:  updated.ID,
+			Title:       updated.Title,
+			Description: updated.Description,
+			State:       MilestoneStateClosed,
+		}
+		if updated.DueDate != nil {
+			t := time.Time(*updated.DueDate)
+			result.DueDate = &t
+		}
+		return result, nil
 	}
 
 	result := Milestone{
-		ExternalID:  int64(created.ID),
+		ExternalID:  created.ID,
 		Title:       created.Title,
 		Description: created.Description,
 		State:       MilestoneStateOpen,
-	}
-	if m.State == MilestoneStateClosed {
-		result.State = MilestoneStateClosed
 	}
 	if created.DueDate != nil {
 		t := time.Time(*created.DueDate)

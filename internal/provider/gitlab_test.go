@@ -680,7 +680,14 @@ func TestGitLabProviderListMilestones(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v4/projects/my-group%2Frepo-a/milestones", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `[{"id":10,"title":"v1.0","description":"First stable release","state":"active","due_date":null}]`)
+		switch r.URL.Query().Get("state") {
+		case "active":
+			fmt.Fprint(w, `[{"id":10,"title":"v1.0","description":"First stable release","state":"active","due_date":null}]`)
+		case "closed":
+			fmt.Fprint(w, `[{"id":11,"title":"v0.9","description":"Beta","state":"closed","due_date":null}]`)
+		default:
+			fmt.Fprint(w, `[]`)
+		}
 	})
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -691,8 +698,8 @@ func TestGitLabProviderListMilestones(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListMilestones: %v", err)
 	}
-	if len(milestones) != 1 {
-		t.Fatalf("len = %d, want 1", len(milestones))
+	if len(milestones) != 2 {
+		t.Fatalf("len = %d, want 2 (1 active + 1 closed)", len(milestones))
 	}
 	ms := milestones[0]
 	if ms.ExternalID != 10 || ms.Title != "v1.0" || ms.State != MilestoneStateOpen {
@@ -700,6 +707,10 @@ func TestGitLabProviderListMilestones(t *testing.T) {
 	}
 	if ms.DueDate != nil {
 		t.Errorf("DueDate should be nil, got %v", ms.DueDate)
+	}
+	ms2 := milestones[1]
+	if ms2.ExternalID != 11 || ms2.Title != "v0.9" || ms2.State != MilestoneStateClosed {
+		t.Errorf("milestones[1] = %+v", ms2)
 	}
 }
 
@@ -729,5 +740,49 @@ func TestGitLabProviderCreateMilestone(t *testing.T) {
 	}
 	if got.ExternalID != 10 || got.Title != "v1.0" {
 		t.Errorf("got %+v", got)
+	}
+}
+
+func TestGitLabProviderCreateMilestone_Closed(t *testing.T) {
+	updateCalled := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/my-group%2Frepo-a/milestones", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{"id":10,"title":"v1.0","description":"","state":"active","due_date":null}`)
+	})
+	mux.HandleFunc("/api/v4/projects/my-group%2Frepo-a/milestones/10", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		updateCalled = true
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":10,"title":"v1.0","description":"","state":"closed","due_date":null}`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	p := newGitLabTestProvider(t, server.URL)
+
+	got, err := p.CreateMilestone(context.Background(), "my-group", "repo-a", Milestone{
+		Title: "v1.0",
+		State: MilestoneStateClosed,
+	})
+	if err != nil {
+		t.Fatalf("CreateMilestone: %v", err)
+	}
+	if !updateCalled {
+		t.Error("UpdateMilestone was not called for a closed milestone")
+	}
+	if got.State != MilestoneStateClosed {
+		t.Errorf("State = %q, want MilestoneStateClosed", got.State)
+	}
+	if got.ExternalID != 10 {
+		t.Errorf("ExternalID = %d, want 10", got.ExternalID)
 	}
 }
