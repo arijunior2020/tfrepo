@@ -467,6 +467,18 @@ Ordem recomendada:
 
 A migração de membros (convite, mapeamento de usuários e reassign de issues/PRs) está planejada para uma versão futura.
 
+## Roadmap
+
+Funcionalidades planejadas para versões futuras:
+
+- **Novos providers** — Bitbucket, Gitea, Azure DevOps e instâncias self-hosted de GitHub Enterprise e GitLab EE
+- **Migração de membros** — convite de usuários, mapeamento de identidades e reassign de issues/PRs
+- **Migração de wikis** — conteúdo das wikis dos repositórios
+- **Migração de releases** — releases e assets associados
+- **Modo incremental** — sincronização contínua entre origem e destino após a migração inicial
+
+Contribuições e sugestões são bem-vindas via [issues](https://github.com/arijunior2020/tfrepo/issues) e pull requests.
+
 ## Design
 
 Veja [`docs/superpowers/specs/2026-06-13-tfrepo-go-port-design.md`](docs/superpowers/specs/2026-06-13-tfrepo-go-port-design.md)
