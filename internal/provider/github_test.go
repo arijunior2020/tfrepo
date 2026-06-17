@@ -805,3 +805,56 @@ func TestGitHubProviderCreateIssue(t *testing.T) {
 		t.Errorf("ExternalID = %d, want 10", got.ExternalID)
 	}
 }
+
+func TestGitHubProviderCreateIssueOpen(t *testing.T) {
+	editCalled := false
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/myorg/myrepo/issues", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		writeJSON(t, w, &github.Issue{
+			Number: github.Ptr(11),
+			Title:  github.Ptr("Open issue"),
+			Body:   github.Ptr(""),
+			State:  github.Ptr("open"),
+		})
+	})
+	mux.HandleFunc("/repos/myorg/myrepo/issues/11", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		editCalled = true
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(t, w, &github.Issue{
+			Number: github.Ptr(11),
+			Title:  github.Ptr("Open issue"),
+			Body:   github.Ptr(""),
+			State:  github.Ptr("open"),
+		})
+	})
+	p, _ := newGitHubTestProvider(t, mux.ServeHTTP)
+
+	got, err := p.CreateIssue(context.Background(), "myorg", "myrepo", Issue{
+		Title: "Open issue",
+		Body:  "",
+		State: "open",
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if editCalled {
+		t.Error("expected Edit to not be called for open issues, but it was")
+	}
+	if got.State != "open" {
+		t.Errorf("State = %q, want %q", got.State, "open")
+	}
+	if got.ExternalID != 11 {
+		t.Errorf("ExternalID = %d, want 11", got.ExternalID)
+	}
+}
