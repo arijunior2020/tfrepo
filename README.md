@@ -92,10 +92,11 @@ export GITLAB_TOKEN=glpat-...
 **4. Execute o pipeline:**
 
 ```bash
-tfrepo scan      # lista repositórios → inventory.json
-tfrepo plan      # gera plano de migração → migration-plan.json
-tfrepo migrate   # executa migração → migration-report.json
-tfrepo validate  # verifica integridade → validation-report.json
+tfrepo scan              # lista repositórios → inventory.json
+tfrepo plan              # gera plano de migração → migration-plan.json
+tfrepo migrate           # executa migração → migration-report.json
+tfrepo migrate-labels    # migra labels e milestones → labels-report.json
+tfrepo validate          # verifica integridade → validation-report.json
 ```
 
 ## Configuração
@@ -205,6 +206,17 @@ Flags:
   -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
+### `tfrepo migrate-labels`
+
+Migra labels e milestones de cada repositório de origem para o repositório de destino correspondente, conforme definido em `migration-plan.json`. O resultado é gravado em `labels-report.json`.
+
+Requer que `migration-plan.json` exista (gerado por `tfrepo plan`). Itens já existentes no destino são ignorados (operação idempotente). O `labels-report.json` gerado contém um mapeamento de IDs de milestones necessário pelo plano de migração de issues (Plan 9).
+
+```
+Flags:
+  -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
+```
+
 ### `tfrepo validate`
 
 Compara branches e tags entre origem e destino usando `migration-plan.json`
@@ -226,6 +238,7 @@ migração no mesmo diretório:
 - `inventory.json`
 - `migration-plan.json`
 - `migration-report.json`
+- `labels-report.json`
 - `validation-report.json`
 
 Por padrão, preserva o arquivo de configuração. Use `--include-config` para
@@ -263,12 +276,13 @@ Tokens **nunca** são lidos de arquivos de configuração, logs ou artefatos.
 
 Todos os artefatos são JSON e ficam no diretório de trabalho atual:
 
-| Arquivo                  | Gerado por | Lido por                              |
-|--------------------------|------------|---------------------------------------|
-| `inventory.json`         | `scan`     | `plan`                                |
-| `migration-plan.json`    | `plan`     | `migrate`, `validate`                 |
-| `migration-report.json`  | `migrate`  | `validate` (opcional — pula falhas)   |
-| `validation-report.json` | `validate` | —                                     |
+| Arquivo                  | Gerado por        | Lido por                              |
+|--------------------------|-------------------|---------------------------------------|
+| `inventory.json`         | `scan`            | `plan`                                |
+| `migration-plan.json`    | `plan`            | `migrate`, `validate`                 |
+| `migration-report.json`  | `migrate`         | `validate` (opcional — pula falhas)   |
+| `labels-report.json`     | `migrate-labels`  | `migrate-issues` (em breve)           |
+| `validation-report.json` | `validate`        | —                                     |
 
 ## Segurança
 
