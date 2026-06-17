@@ -12,6 +12,7 @@ var migrationArtifactPaths = []string{
 	migrationPlanPath,
 	migrationReportPath,
 	labelsReportPath,
+	issuesReportPath,
 	validationReportPath,
 }
 

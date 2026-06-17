@@ -36,7 +36,7 @@ func TestRunDestroyRemovesMigrationArtifacts(t *testing.T) {
 	if _, err := os.Stat(configPath); err != nil {
 		t.Errorf("config should remain, got err = %v", err)
 	}
-	if !strings.Contains(stdout.String(), "Removidos 5 arquivos.") {
+	if !strings.Contains(stdout.String(), "Removidos 6 arquivos.") {
 		t.Errorf("stdout = %q, want removal summary", stdout.String())
 	}
 }

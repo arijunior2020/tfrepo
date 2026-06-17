@@ -96,6 +96,7 @@ tfrepo scan              # lista repositórios → inventory.json
 tfrepo plan              # gera plano de migração → migration-plan.json
 tfrepo migrate           # executa migração → migration-report.json
 tfrepo migrate-labels    # migra labels e milestones → labels-report.json
+tfrepo migrate-issues    # migra issues → issues-report.json
 tfrepo validate          # verifica integridade → validation-report.json
 ```
 
@@ -217,6 +218,21 @@ Flags:
   -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
 ```
 
+### `tfrepo migrate-issues`
+
+Migra issues (abertas e fechadas) dos repositórios de origem para o destino.
+Lê `labels-report.json` (se existir) para traduzir referências de milestone.
+Issues já existentes no destino (por título) são ignoradas — operação idempotente.
+
+```bash
+tfrepo migrate-issues
+```
+
+```
+Flags:
+  -c, --config string   arquivo de configuração (padrão: transferepo.config.yaml)
+```
+
 ### `tfrepo validate`
 
 Compara branches e tags entre origem e destino usando `migration-plan.json`
@@ -239,6 +255,7 @@ migração no mesmo diretório:
 - `migration-plan.json`
 - `migration-report.json`
 - `labels-report.json`
+- `issues-report.json`
 - `validation-report.json`
 
 Por padrão, preserva o arquivo de configuração. Use `--include-config` para
@@ -281,7 +298,8 @@ Todos os artefatos são JSON e ficam no diretório de trabalho atual:
 | `inventory.json`         | `scan`            | `plan`                                |
 | `migration-plan.json`    | `plan`            | `migrate`, `validate`                 |
 | `migration-report.json`  | `migrate`         | `validate` (opcional — pula falhas)   |
-| `labels-report.json`     | `migrate-labels`  | `migrate-issues` (em breve)           |
+| `labels-report.json`     | `migrate-labels`  | `migrate-issues` (milestone mapping)  |
+| `issues-report.json`     | `migrate-issues`  | —                                     |
 | `validation-report.json` | `validate`        | —                                     |
 
 ## Segurança
