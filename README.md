@@ -433,6 +433,36 @@ Todos os artefatos são JSON e ficam no diretório de trabalho atual:
 - Repositórios clonados durante `migrate` ficam em diretórios temporários
   isolados removidos ao final — inclusive em caso de erro ou `Ctrl+C`.
 
+## Limitações conhecidas
+
+### Identidade de usuários
+
+O tfrepo não migra usuários nem reconecta identidades entre plataformas. O impacto varia por tipo de dado:
+
+**Histórico git (commits, branches, tags)**
+
+O `migrate` preserva exatamente os metadados originais de cada commit — nome e email do autor viajam intactos via `git push --mirror`. A associação de perfil no destino depende exclusivamente do email:
+
+| Situação | Resultado no destino |
+|---|---|
+| Usuário cadastrado com o mesmo email | Commit linkado ao perfil automaticamente |
+| Usuário cadastrado com email diferente | Commit exibido como autor anônimo (sem link de perfil) |
+| Usuário inexistente no destino | Commit exibido como autor anônimo (sem link de perfil) |
+
+O histórico em si é íntegro — só a associação visual de perfil é afetada.
+
+**Issues e pull requests**
+
+Issues e PRs criados por `migrate-issues` e `migrate-prs` ficam atribuídos ao usuário do token configurado, não ao autor original. Isso é uma limitação das APIs das plataformas: a criação em nome de outro usuário requer permissões de administrador que não estão disponíveis na maioria dos ambientes.
+
+Os campos `assignee` também não são migrados, pois dependem de o usuário existir no destino com o mesmo identificador.
+
+**Recomendação prática**
+
+Antes de rodar a migração, oriente os membros do time a se cadastrarem no destino usando o **mesmo email** que usam nos commits — isso garante que o histórico git fique corretamente associado aos perfis sem nenhuma intervenção adicional.
+
+A migração de membros (convite, mapeamento de usuários e reassign de issues/PRs) está planejada para uma versão futura.
+
 ## Design
 
 Veja [`docs/superpowers/specs/2026-06-13-tfrepo-go-port-design.md`](docs/superpowers/specs/2026-06-13-tfrepo-go-port-design.md)
