@@ -651,16 +651,64 @@ func (p *GitLabProvider) CreateIssue(ctx context.Context, namespace, repo string
 	return gitlabIssueToIssue(created), nil
 }
 
+// gitlabMRtoPullRequest maps a GitLab BasicMergeRequest to the provider-neutral
+// PullRequest type. It normalises "opened" → "open"; "closed" and "merged"
+// both become "closed".
+func gitlabMRtoPullRequest(mr *gitlab.BasicMergeRequest) PullRequest {
+	state := "open"
+	if mr.State == "closed" || mr.State == "merged" {
+		state = "closed"
+	}
+	return PullRequest{
+		ExternalID:   int64(mr.IID),
+		Title:        mr.Title,
+		Body:         mr.Description,
+		State:        state,
+		SourceBranch: mr.SourceBranch,
+		TargetBranch: mr.TargetBranch,
+	}
+}
+
 // ListPullRequests returns open merge requests for the repository.
-// Not yet implemented — will be added in Plan 10 (migrate-prs).
-func (p *GitLabProvider) ListPullRequests(_ context.Context, _, _ string) ([]PullRequest, error) {
-	panic("not implemented")
+func (p *GitLabProvider) ListPullRequests(ctx context.Context, namespace, repo string) ([]PullRequest, error) {
+	pid := gitlabPID(namespace, repo)
+	state := "opened"
+	var prs []PullRequest
+
+	opts := &gitlab.ListProjectMergeRequestsOptions{
+		State:       &state,
+		ListOptions: gitlab.ListOptions{PerPage: listPerPage},
+	}
+	for {
+		page, resp, err := p.client.MergeRequests.ListProjectMergeRequests(pid, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("list merge requests for %s: %w", pid, err)
+		}
+		for _, mr := range page {
+			prs = append(prs, gitlabMRtoPullRequest(mr))
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return prs, nil
 }
 
 // CreatePullRequest creates a merge request on the target repository.
-// Not yet implemented — will be added in Plan 10 (migrate-prs).
-func (p *GitLabProvider) CreatePullRequest(_ context.Context, _, _ string, _ PullRequest) (PullRequest, error) {
-	panic("not implemented")
+func (p *GitLabProvider) CreatePullRequest(ctx context.Context, namespace, repo string, pr PullRequest) (PullRequest, error) {
+	pid := gitlabPID(namespace, repo)
+
+	created, _, err := p.client.MergeRequests.CreateMergeRequest(pid, &gitlab.CreateMergeRequestOptions{
+		Title:        gitlab.Ptr(pr.Title),
+		Description:  gitlab.Ptr(pr.Body),
+		SourceBranch: gitlab.Ptr(pr.SourceBranch),
+		TargetBranch: gitlab.Ptr(pr.TargetBranch),
+	}, gitlab.WithContext(ctx))
+	if err != nil {
+		return PullRequest{}, fmt.Errorf("create merge request %q in %s: %w", pr.Title, pid, err)
+	}
+	return gitlabMRtoPullRequest(&created.BasicMergeRequest), nil
 }
 
 // Compile-time check that GitLabProvider implements RepositoryProvider.

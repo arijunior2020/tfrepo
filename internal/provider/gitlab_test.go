@@ -872,6 +872,68 @@ func TestGitLabProviderCreateIssue(t *testing.T) {
 	}
 }
 
+func TestGitLabProviderListPullRequests(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/mygroup%2Fmyrepo/merge_requests", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("state") != "opened" {
+			t.Errorf("state = %q, want opened", r.URL.Query().Get("state"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"id":100,"iid":1,"title":"Open MR","description":"desc","state":"opened","source_branch":"feature/y","target_branch":"main"}]`)
+	})
+
+	p, _ := newGitLabTestServer(t, "test-token", mux.ServeHTTP)
+	prs, err := p.ListPullRequests(t.Context(), "mygroup", "myrepo")
+	if err != nil {
+		t.Fatalf("ListPullRequests: %v", err)
+	}
+	if len(prs) != 1 {
+		t.Fatalf("len(prs) = %d, want 1", len(prs))
+	}
+	got := prs[0]
+	if got.ExternalID != 1 {
+		t.Errorf("ExternalID = %d, want 1 (IID, não ID global)", got.ExternalID)
+	}
+	if got.State != "open" {
+		t.Errorf("State = %q, want open (deve normalizar 'opened')", got.State)
+	}
+	if got.SourceBranch != "feature/y" {
+		t.Errorf("SourceBranch = %q, want feature/y", got.SourceBranch)
+	}
+	if got.TargetBranch != "main" {
+		t.Errorf("TargetBranch = %q, want main", got.TargetBranch)
+	}
+}
+
+func TestGitLabProviderCreatePullRequest(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/mygroup%2Fmyrepo/merge_requests", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":200,"iid":7,"title":"New MR","description":"","state":"opened","source_branch":"feat/z","target_branch":"main"}`)
+	})
+
+	p, _ := newGitLabTestServer(t, "test-token", mux.ServeHTTP)
+	result, err := p.CreatePullRequest(t.Context(), "mygroup", "myrepo", PullRequest{
+		Title:        "New MR",
+		Body:         "body",
+		State:        "open",
+		SourceBranch: "feat/z",
+		TargetBranch: "main",
+	})
+	if err != nil {
+		t.Fatalf("CreatePullRequest: %v", err)
+	}
+	if result.ExternalID != 7 {
+		t.Errorf("ExternalID = %d, want 7 (IID)", result.ExternalID)
+	}
+	if result.State != "open" {
+		t.Errorf("State = %q, want open", result.State)
+	}
+	if result.SourceBranch != "feat/z" {
+		t.Errorf("SourceBranch = %q, want feat/z", result.SourceBranch)
+	}
+}
+
 func TestGitLabProviderCreateIssueOpen(t *testing.T) {
 	updateCalled := false
 	mux := http.NewServeMux()
