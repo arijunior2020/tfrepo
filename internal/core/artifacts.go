@@ -109,6 +109,24 @@ type ValidationReport struct {
 	Results     []ValidationResult `json:"results"`
 }
 
+// MilestoneIDMap maps source milestone ExternalID (decimal string) to target ExternalID.
+// String keys required for JSON object key compatibility.
+type MilestoneIDMap = map[string]int64
+
+type LabelsMigrateResult struct {
+	ID                string         `json:"id"`
+	Status            string         `json:"status"` // "success" | "failed"
+	LabelsCreated     int            `json:"labelsCreated"`
+	MilestonesCreated int            `json:"milestonesCreated"`
+	MilestoneIDMap    MilestoneIDMap `json:"milestoneIdMap"`
+	Errors            []string       `json:"errors,omitempty"`
+}
+
+type LabelsReport struct {
+	GeneratedAt time.Time             `json:"generatedAt"`
+	Results     []LabelsMigrateResult `json:"results"`
+}
+
 // WriteJSON marshals v as indented JSON and writes it to path, creating or
 // truncating the file with mode 0644.
 func WriteJSON(path string, v any) error {
